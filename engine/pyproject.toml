@@ -40,7 +40,8 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# 本机系统临时目录存在历史 ACL 问题（PermissionError），把 basetemp 放到仓库内
+addopts = "-q --basetemp=.pytest-tmp"
 markers = [
     "network: 需要真实网络的测试（默认不跑）",
 ]

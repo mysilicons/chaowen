@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rmrb-engine", description="人民日报阅报器引擎")
     parser.add_argument("--version", action="store_true", help="打印版本号")
     parser.add_argument("--parse", metavar="HTML", help="解析本地版面页 HTML 并输出摘要")
+    parser.add_argument("--article", metavar="HTML", help="解析本地正文页 HTML 并输出摘要")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="解析用的页面 URL")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出")
     return parser
@@ -44,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
         html = Path(args.parse).read_text(encoding="utf-8")
         issue = parse_layout(html, args.base_url)
         if args.json:
-            print(json.dumps(issue.model_dump(mode="json"), ensure_ascii=False, indent=2))
+            print(json.dumps(issue.dump(), ensure_ascii=False, indent=2))
         else:
             current = next((p for p in issue.pages if p.pdf_url), None)
             print(f"date={issue.date} pages={issue.page_count} source={args.base_url}")
@@ -53,6 +54,23 @@ def main(argv: list[str] | None = None) -> int:
                     f"current={current.no:02d} {current.title} "
                     f"articles={len(current.articles)} pdf={current.pdf_url}"
                 )
+        return 0
+
+    if args.article:
+        from .site.article import parse_article
+
+        html = Path(args.article).read_text(encoding="utf-8")
+        article = parse_article(html, args.base_url)
+        if args.json:
+            print(json.dumps(article.dump(), ensure_ascii=False, indent=2))
+        else:
+            images = sum(1 for block in article.blocks if block.type == "img")
+            chars = sum(len(block.text or "") for block in article.blocks)
+            print(f"title={article.title}")
+            print(
+                f"author={article.author} blocks={len(article.blocks)} "
+                f"images={images} chars={chars}"
+            )
         return 0
 
     parser.print_help()
