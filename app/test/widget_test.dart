@@ -93,8 +93,7 @@ void main() {
     await tester.pumpWidget(wrap(const LibraryView(), FakeEngine()));
     await tester.pumpAndSettle();
 
-    expect(find.text('已归档'), findsWidgets);
-    expect(find.text('已下载'), findsOneWidget);
+    expect(find.text('下载本期'), findsNothing);
   });
 
   testWidgets('点击版面进入阅读器（设置阅读目标）', (tester) async {
@@ -113,6 +112,6 @@ void main() {
     );
     expect(container.read(readerTargetProvider)?.no, 1);
     expect(container.read(readerTargetProvider)?.date, '2026-10-29');
-    expect(container.read(shellIndexProvider), 2);
+    expect(container.read(shellIndexProvider), 1);
   });
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/engine_client.dart';
@@ -8,6 +7,7 @@ import 'state/providers.dart';
 import 'theme/tokens.dart';
 import 'views/downloads_view.dart';
 import 'views/library_view.dart';
+import 'views/settings_view.dart';
 import 'views/reader_view.dart';
 
 class RmrbApp extends StatelessWidget {
@@ -185,7 +185,7 @@ class HomeShell extends ConsumerWidget {
           Expanded(
             child: IndexedStack(
               index: index,
-              children: const [LibraryView(), DownloadsView(), ReaderView()],
+              children: const [LibraryView(), ReaderView(), DownloadsView(), SettingsView()],
             ),
           ),
         ],
@@ -220,6 +220,7 @@ class _Sidebar extends StatelessWidget {
           Padding(
             padding: EdgeInsets.fromLTRB(collapsed ? 8 : 22, 16, collapsed ? 8 : 14, 10),
             child: Row(
+              mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
                 if (!collapsed)
                   const Expanded(
@@ -273,8 +274,8 @@ class _Sidebar extends StatelessWidget {
           _NavItem(
             icon: Icons.download_outlined,
             label: collapsed ? '' : '下载中心',
-            selected: index == 1,
-            onTap: () => onSelect(1),
+            selected: index == 2,
+            onTap: () => onSelect(2),
           ),
           const Spacer(),
           _AboutButton(collapsed: collapsed),
@@ -344,7 +345,7 @@ class _AboutButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
-      onTap: () => _show(context, ref),
+      onTap: () => ref.read(shellIndexProvider.notifier).select(3),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: collapsed ? 18 : 24, vertical: 10),
         child: Row(
@@ -353,120 +354,11 @@ class _AboutButton extends ConsumerWidget {
             const Icon(Icons.settings_outlined, size: 18, color: AppColors.text2),
             if (!collapsed) ...[
               const SizedBox(width: 10),
-              const Text(
-                '设置',
-                style: TextStyle(fontSize: 13, color: AppColors.text),
-              ),
+              const Text('设置', style: TextStyle(fontSize: 13, color: AppColors.text)),
             ],
           ],
         ),
       ),
     );
   }
-
-  Future<void> _show(BuildContext context, WidgetRef ref) async {
-    final engine = ref.read(engineProvider);
-    Map<String, dynamic> hello = const {};
-    try {
-      final raw = await engine.call('hello', {'protocol': 1, 'client': 'rmrb-reader/0.1.0'});
-      if (raw is Map<String, dynamic>) hello = raw;
-    } catch (_) {
-      // 引擎没响应也不阻塞"关于"对话框
-    }
-    if (!context.mounted) return;
-
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.paper,
-        title: const Text(
-          '设置',
-          style: TextStyle(
-            fontFamily: AppFonts.serif,
-            fontFamilyFallback: AppFonts.fallback,
-            fontSize: 18,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('朝闻 · 人民日报阅报器', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
-            _row('引擎', '${hello['engine'] ?? '未连接'} (Python ${hello['python'] ?? '-'})'),
-            _row('协议', 'v${hello['protocol'] ?? '-'}'),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(
-                  width: 64,
-                  child: Text('下载目录', style: TextStyle(fontSize: 12, color: AppColors.text2)),
-                ),
-                Expanded(
-                  child: SelectableText(
-                    hello['library'] as String? ?? '-',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => _pickDir(context, ref, hello),
-                  child: const Text('更改…', style: TextStyle(fontSize: 12)),
-                ),
-              ],
-            ),
-            _row('缓存目录', hello['cache'] as String? ?? '-'),
-            const SizedBox(height: 12),
-            const Text(
-              '仅供个人学习研究使用，请勿用于商业目的或对外分发。',
-              style: TextStyle(fontSize: 11, color: AppColors.text2, height: 1.6),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('关闭')),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _pickDir(
-    BuildContext context,
-    WidgetRef ref,
-    Map<String, dynamic> hello,
-  ) async {
-    final current = hello['library'] as String?;
-    final picked = await getDirectoryPath(
-      initialDirectory: current,
-      confirmButtonText: '用这个目录',
-    );
-    if (picked == null || !context.mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(engineProvider).call('settings.set', {'downloadDir': picked});
-      ref.invalidate(helloProvider);
-      ref.invalidate(issueProvider);
-      ref.invalidate(monthStatusProvider);
-      messenger.showSnackBar(SnackBar(content: Text('下载目录已切换：$picked')));
-      if (context.mounted) Navigator.of(context).pop();
-    } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text('切换失败：$error')));
-    }
-  }
-
-  Widget _row(String label, String value) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 64,
-          child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
-        ),
-        Expanded(
-          child: SelectableText(value, style: const TextStyle(fontSize: 12)),
-        ),
-      ],
-    ),
-  );
 }

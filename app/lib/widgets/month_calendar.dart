@@ -79,10 +79,11 @@ class MonthCalendar extends ConsumerWidget {
     final isSelected =
         day.year == selected.year && day.month == selected.month && day.day == selected.day;
     final status = statuses[isoDate(day)];
+    final future = day.isAfter(DateTime.now());
 
     return InkWell(
       borderRadius: BorderRadius.circular(6),
-      onTap: () {
+      onTap: future ? null : () {
         ref.read(selectedDateProvider.notifier).select(day);
         ref.read(visibleMonthProvider.notifier).select(day);
       },
@@ -101,7 +102,11 @@ class MonthCalendar extends ConsumerWidget {
               '${day.day}',
               style: TextStyle(
                 fontSize: 13,
-                color: isSelected ? Colors.white : AppColors.text,
+                color: isSelected
+                    ? Colors.white
+                    : future
+                    ? AppColors.border
+                    : AppColors.text,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
