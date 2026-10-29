@@ -16,7 +16,8 @@ from typing import Any
 
 from . import __version__
 from .core.errors import EngineError, ErrorCode
-from .core.paths import LibraryPaths
+from .core.models import Issue, Page
+from .core.paths import LibraryPaths, layout_url
 from .services.article_service import ArticleService
 from .services.queue import DownloadService
 from .store import settings
@@ -82,6 +83,14 @@ class Engine:
 
     def issue_parse(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
         d = parse_date(params)
+
+        # 历史日期的目录几乎不会变：库里已有就直接返回，切日期零网络。
+        # 当天仍然走网络（报纸可能在白天更新版面）。
+        if d < Date.today():
+            cached = self._issue_from_db(d)
+            if cached is not None:
+                return cached
+
         issue = self.service.fetch_issue(d)
         # 版面列表只给当前页的图与直链；其余版用库里已解析过的结果补齐，
         # 避免为了 20 张缩略图再打 20 个请求（低速约束下的关键优化）。
@@ -92,7 +101,35 @@ class Engine:
             page.thumb_url = page.thumb_url or record["thumb_url"]
             page.pdf_url = page.pdf_url or record["pdf_url"]
             page.title = page.title or record["title"]
+        # 把这次解析到的版面写进库，供下次直接命中
+        for page in issue.pages:
+            self.repo.save_page(
+                d,
+                page.no,
+                status="parsed",
+                title=page.title,
+                pdf_url=page.pdf_url,
+                thumb_url=page.thumb_url,
+            )
         return issue.dump()
+
+    def _issue_from_db(self, d: Date) -> dict[str, Any] | None:
+        rows = self.repo.list_pages(d)
+        if not rows or any(not row["title"] for row in rows):
+            return None
+
+        base = layout_url(d).replace("node_01.html", "")
+        pages = [
+            Page(
+                no=row["page_no"],
+                title=row["title"],
+                url=f"{base}node_{row['page_no']:02d}.html",
+                pdf_url=row["pdf_url"],
+                thumb_url=row["thumb_url"],
+            )
+            for row in rows
+        ]
+        return Issue(date=d, page_count=len(pages), pages=pages, source_url=f"{base}node_01.html").dump()
 
     def issue_status(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
         d = parse_date(params)
