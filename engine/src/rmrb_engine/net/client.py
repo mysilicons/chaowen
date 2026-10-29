@@ -67,6 +67,10 @@ class HttpClient:
         response.encoding = "utf-8"
         return response.text
 
+    def get_bytes(self, url: str, headers: dict[str, str] | None = None) -> bytes:
+        response = self._send("GET", url, headers=headers)
+        return response.content
+
     @contextmanager
     def stream(
         self, url: str, headers: dict[str, str] | None = None

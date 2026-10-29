@@ -71,7 +71,7 @@ void main() {
     expect(find.text('已下载'), findsOneWidget);
   });
 
-  testWidgets('点击版面弹出预览并列出本版文章', (tester) async {
+  testWidgets('点击版面进入阅读器（设置阅读目标）', (tester) async {
     tester.view.physicalSize = const Size(1600, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -82,7 +82,11 @@ void main() {
     await tester.tap(find.byType(PageThumb).first);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('第01版'), findsOneWidget);
-    expect(find.textContaining('第1版文章一'), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(LibraryView)),
+    );
+    expect(container.read(readerTargetProvider)?.no, 1);
+    expect(container.read(readerTargetProvider)?.date, '2026-10-29');
+    expect(container.read(shellIndexProvider), 2);
   });
 }

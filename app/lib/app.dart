@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/engine_client.dart';
 import 'core/models.dart';
+import 'state/providers.dart';
 import 'theme/tokens.dart';
 import 'views/downloads_view.dart';
 import 'views/library_view.dart';
+import 'views/reader_view.dart';
 
 class RmrbApp extends StatelessWidget {
   const RmrbApp({super.key, required this.engine});
@@ -158,32 +160,26 @@ class _Splash extends StatelessWidget {
   }
 }
 
-class HomeShell extends ConsumerStatefulWidget {
+class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
 
   @override
-  ConsumerState<HomeShell> createState() => _HomeShellState();
-}
-
-class _HomeShellState extends ConsumerState<HomeShell> {
-  int _index = 0;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final index = ref.watch(shellIndexProvider);
     return Scaffold(
       backgroundColor: AppColors.paper,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Sidebar(
-            index: _index,
-            onSelect: (value) => setState(() => _index = value),
+            index: index,
+            onSelect: (value) => ref.read(shellIndexProvider.notifier).select(value),
           ),
           const VerticalDivider(width: 1, color: AppColors.border),
           Expanded(
             child: IndexedStack(
-              index: _index,
-              children: const [LibraryView(), DownloadsView()],
+              index: index,
+              children: const [LibraryView(), DownloadsView(), ReaderView()],
             ),
           ),
         ],

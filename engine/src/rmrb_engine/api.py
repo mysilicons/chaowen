@@ -12,6 +12,7 @@ from typing import Any
 
 from . import __version__
 from .core.errors import EngineError, ErrorCode
+from .services.article_service import ArticleService
 from .services.queue import DownloadService
 from .store.repo import Repo
 
@@ -36,11 +37,13 @@ class Engine:
         self.repo = repo
         self._emit = lambda _event, _data: None
         self._job_seq = 0
+        self.articles = ArticleService(service.http, repo, service.paths)
 
     def bind_emitter(self, emit: Any) -> None:
         # 服务层的事件必须走同一条通道，否则下载进度到不了客户端
         self._emit = emit
         self.service.emit = emit
+        self.articles.emit = emit
 
     @property
     def handlers(self) -> dict[str, Any]:
@@ -49,6 +52,7 @@ class Engine:
             "issue.parse": self.issue_parse,
             "issue.status": self.issue_status,
             "library.month": self.library_month,
+            "article.page": self.article_page,
             "download.start": self.download_start,
         }
 
@@ -108,6 +112,14 @@ class Engine:
             }
             for row in self.repo.list_month(year, month)
         ]
+
+    def article_page(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        d = parse_date(params)
+        raw_no = params.get("pageNo")
+        if not isinstance(raw_no, int) or not 1 <= raw_no <= 40:
+            raise EngineError(ErrorCode.BAD_REQUEST, "pageNo 非法")
+        refresh = bool(params.get("refresh"))
+        return self.articles.fetch_page(d, raw_no, refresh=refresh)
 
     def download_start(self, params: dict[str, Any], ctx: Any) -> None:
         d = parse_date(params)

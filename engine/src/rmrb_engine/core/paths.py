@@ -37,3 +37,9 @@ class LibraryPaths:
 
     def single_pdf(self, d: Date, page_no: int) -> Path:
         return self.tmp_dir(d) / f"{page_no:02d}.pdf"
+
+    def text_json(self, d: Date, page_no: int) -> Path:
+        return self.cache / "text" / d.isoformat() / f"{page_no:02d}.json"
+
+    def image_cache(self, filename: str) -> Path:
+        return self.cache / "img" / filename

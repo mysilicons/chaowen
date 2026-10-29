@@ -113,3 +113,85 @@ class EngineException implements Exception {
 }
 
 enum EngineState { idle, starting, ready, crashed, failed }
+
+
+enum PageKind { normal, single, imageOnly, empty, failed }
+
+PageKind _kindFrom(String raw) => switch (raw) {
+  'normal' => PageKind.normal,
+  'single' => PageKind.single,
+  'image_only' => PageKind.imageOnly,
+  'empty' => PageKind.empty,
+  _ => PageKind.failed,
+};
+
+class Block {
+  const Block({required this.type, this.text, this.src, this.local, this.caption});
+
+  final String type;
+  final String? text;
+  final String? src;
+  final String? local;
+  final String? caption;
+
+  bool get isImage => type == 'img';
+
+  factory Block.fromJson(Map<String, dynamic> json) => Block(
+    type: _asString(json['type']),
+    text: _asStringOrNull(json['text']),
+    src: _asStringOrNull(json['src']),
+    local: _asStringOrNull(json['local']),
+    caption: _asStringOrNull(json['caption']),
+  );
+}
+
+class Article {
+  const Article({
+    required this.title,
+    required this.url,
+    this.author,
+    this.blocks = const [],
+  });
+
+  final String title;
+  final String url;
+  final String? author;
+  final List<Block> blocks;
+
+  factory Article.fromJson(Map<String, dynamic> json) => Article(
+    title: _asString(json['title']).trim(),
+    url: _asString(json['url']),
+    author: _asStringOrNull(json['author']),
+    blocks: (json['blocks'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(Block.fromJson)
+        .toList(growable: false),
+  );
+}
+
+class ArticlePage {
+  const ArticlePage({
+    required this.date,
+    required this.pageNo,
+    required this.title,
+    required this.kind,
+    this.articles = const [],
+  });
+
+  final String date;
+  final int pageNo;
+  final String title;
+  final PageKind kind;
+  final List<Article> articles;
+
+  factory ArticlePage.fromJson(Map<String, dynamic> json) => ArticlePage(
+    date: _asString(json['date']),
+    pageNo: _asInt(json['pageNo']),
+    title: _asString(json['title']),
+    kind: _kindFrom(_asString(json['kind'])),
+    articles: (json['articles'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(Article.fromJson)
+        .toList(growable: false),
+  );
+}

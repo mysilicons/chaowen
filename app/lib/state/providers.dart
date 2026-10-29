@@ -122,6 +122,74 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
       state = state.where((job) => job.status == 'running').toList(growable: false);
 }
 
+/// 主界面当前页：0 书架 / 1 下载中心 / 2 阅读器
+final shellIndexProvider = NotifierProvider<ShellIndex, int>(ShellIndex.new);
+
+class ShellIndex extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void select(int value) => state = value;
+}
+
+/// 阅读目标：日期 + 版号
+final readerTargetProvider =
+    NotifierProvider<ReaderTarget, ({String date, int no})?>(ReaderTarget.new);
+
+class ReaderTarget extends Notifier<({String date, int no})?> {
+  @override
+  ({String date, int no})? build() => null;
+
+  void open(String date, int no) => state = (date: date, no: no);
+}
+
+/// 当前阅读的版号（与阅读目标分离，便于版条切换）
+final readerPageProvider = NotifierProvider<ReaderPage, int>(ReaderPage.new);
+
+class ReaderPage extends Notifier<int> {
+  @override
+  int build() => 1;
+
+  void select(int value) => state = value;
+}
+
+final readerModeProvider = NotifierProvider<ReaderMode, String>(ReaderMode.new);
+
+class ReaderMode extends Notifier<String> {
+  @override
+  String build() => 'text';
+
+  void select(String value) => state = value;
+}
+
+final readerScaleProvider = NotifierProvider<ReaderScale, double>(ReaderScale.new);
+
+class ReaderScale extends Notifier<double> {
+  @override
+  double build() => 1.0;
+
+  void step(double delta) {
+    final next = (state + delta).clamp(0.85, 1.5);
+    state = double.parse(next.toStringAsFixed(2));
+  }
+}
+
+/// 某期是否已合并（阅读器需要 mergedPath）
+final issueStatusProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, isoDate) async {
+  final raw = await ref.watch(engineProvider).call('issue.status', {'date': isoDate});
+  return raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
+});
+
+/// 某一版的文字内容（blocks）
+final articlePageProvider =
+    FutureProvider.family<ArticlePage, ({String date, int no})>((ref, key) async {
+  final raw = await ref
+      .watch(engineProvider)
+      .call('article.page', {'date': key.date, 'pageNo': key.no});
+  return ArticlePage.fromJson(raw is Map<String, dynamic> ? raw : const {});
+});
+
 DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
 
 String isoDate(DateTime value) =>

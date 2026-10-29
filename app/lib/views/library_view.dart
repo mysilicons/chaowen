@@ -12,6 +12,12 @@ class LibraryView extends ConsumerWidget {
 
   static const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
+  void _openReader(WidgetRef ref, String isoDate, PageInfo page) {
+    ref.read(readerTargetProvider.notifier).open(isoDate, page.no);
+    ref.read(readerPageProvider.notifier).select(page.no);
+    ref.read(shellIndexProvider.notifier).select(2);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final date = ref.watch(selectedDateProvider);
@@ -57,7 +63,13 @@ class LibraryView extends ConsumerWidget {
             ],
           ),
         ),
-        Expanded(child: _IssueBody(date: iso, issue: issue)),
+        Expanded(
+          child: _IssueBody(
+            date: iso,
+            issue: issue,
+            onOpen: (page) => _openReader(ref, iso, page),
+          ),
+        ),
         _ActionBar(date: iso, status: dayStatus),
       ],
     );
@@ -136,10 +148,11 @@ class _StateBadge extends StatelessWidget {
 }
 
 class _IssueBody extends StatelessWidget {
-  const _IssueBody({required this.date, required this.issue});
+  const _IssueBody({required this.date, required this.issue, required this.onOpen});
 
   final String date;
   final AsyncValue<Issue> issue;
+  final ValueChanged<PageInfo> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -180,10 +193,7 @@ class _IssueBody extends StatelessWidget {
                   itemCount: data.pages.length,
                   itemBuilder: (context, index) {
                     final page = data.pages[index];
-                    return PageThumb(
-                      page: page,
-                      onTap: () => _showPreview(context, page),
-                    );
+                    return PageThumb(page: page, onTap: () => onOpen(page));
                   },
                 );
               },
@@ -191,50 +201,6 @@ class _IssueBody extends StatelessWidget {
     );
   }
 
-  void _showPreview(BuildContext context, PageInfo page) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.paper,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '第${page.no.toString().padLeft(2, '0')}版 · ${page.title}',
-                style: const TextStyle(
-                  fontFamily: AppFonts.serif,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (page.articles.isEmpty)
-                const Text('本版无可提取标题', style: TextStyle(color: AppColors.text2))
-              else
-                ...page.articles.map(
-                  (article) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: Text(
-                      '· ${article.title}',
-                      style: const TextStyle(fontSize: 14, height: 1.6),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 14),
-              const Text(
-                '正文阅读将在 P3 接入',
-                style: TextStyle(fontSize: 12, color: AppColors.text2),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _ActionBar extends ConsumerWidget {
