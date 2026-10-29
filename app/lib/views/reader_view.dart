@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,81 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
   bool _pdfOpened = false;
   bool _textOpened = false;
 
+  /// 每期只提醒一次，避免反复弹窗
+  final Set<String> _prompted = {};
+  StreamSubscription<EngineEvent>? _archiveSub;
+
+  @override
+  void dispose() {
+    _archiveSub?.cancel();
+    super.dispose();
+  }
+
+  /// 进入 PDF 模式但本期没下载时，问一次要不要现在下
+  void _maybePrompt(String date, bool pdfReady, bool statusLoaded) {
+    if (pdfReady || !statusLoaded) return;
+    if (!_prompted.add(date)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _askDownload(date));
+  }
+
+  Future<void> _askDownload(String date) async {
+    if (!mounted) return;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.paper,
+        title: const Text(
+          '本期还没下载',
+          style: TextStyle(fontFamily: AppFonts.serif, fontFamilyFallback: AppFonts.fallback),
+        ),
+        content: const Text(
+          'PDF 模式需要整期文件。现在下载吗？\n约 60 MB，低速下载约 1 分钟。',
+          style: TextStyle(fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('先看文字'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
+            child: const Text('下载本期'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (accepted != true) {
+      ref.read(readerModeProvider.notifier).select('text');
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(engineProvider).call('download.start', {'date': date});
+      messenger.showSnackBar(const SnackBar(content: Text('已开始下载，完成后自动显示')));
+      _watchArchive(date);
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('下载失败：$error')));
+      ref.read(readerModeProvider.notifier).select('text');
+    }
+  }
+
+  void _watchArchive(String date) {
+    _archiveSub?.cancel();
+    _archiveSub = ref.read(engineProvider).events.listen((event) {
+      if (event.name == 'issue.archived' && event.data['date'] == date) {
+        ref.invalidate(issueStatusProvider(date));
+        _archiveSub?.cancel();
+      }
+      if (event.name == 'job.finished' && event.data['date'] == date) {
+        ref.invalidate(issueStatusProvider(date));
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final target = ref.watch(readerTargetProvider);
@@ -35,8 +111,17 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
     final mode = ref.watch(readerModeProvider);
     final scale = ref.watch(readerScaleProvider);
     final issue = ref.watch(issueProvider(target.date)).value;
-    final status = ref.watch(issueStatusProvider(target.date)).value;
+    final statusAsync = ref.watch(issueStatusProvider(target.date));
+    final status = statusAsync.value;
     final mergedPath = status?['mergedPath'] as String?;
+    final jobs = ref.watch(queueProvider);
+    final running = jobs
+        .where((job) => job.date == target.date && job.status == 'running')
+        .firstOrNull;
+    final pdfReady = mergedPath != null && File(mergedPath).existsSync();
+    if (mode == 'pdf') {
+      _maybePrompt(target.date, pdfReady, statusAsync.hasValue);
+    }
     final pages = issue?.pages ?? const <PageInfo>[];
     final page = pages.where((item) => item.no == pageNo).firstOrNull;
 
@@ -67,7 +152,19 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
                 },
               ),
               const VerticalDivider(width: 1, color: AppColors.border),
-              Expanded(child: _body(target.date, pageNo, page, scale, mode, mergedPath)),
+              Expanded(
+                child: _body(
+                  target.date,
+                  pageNo,
+                  page,
+                  scale,
+                  mode,
+                  mergedPath,
+                  running?.progress,
+                  running?.currentPage ?? 0,
+                  running?.total ?? 0,
+                ),
+              ),
             ],
           ),
         ),
@@ -82,6 +179,9 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
     double scale,
     String mode,
     String? mergedPath,
+    double? progress,
+    int currentPage,
+    int total,
   ) {
     if (mode == 'pdf') _pdfOpened = true;
     if (mode == 'text') _textOpened = true;
@@ -90,7 +190,14 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
       index: mode == 'pdf' ? 0 : 1,
       children: [
         _pdfOpened
-            ? _PdfPane(path: mergedPath, pageNo: pageNo, controller: _pdfController)
+            ? _PdfPane(
+                path: mergedPath,
+                pageNo: pageNo,
+                controller: _pdfController,
+                progress: progress,
+                currentPage: currentPage,
+                total: total,
+              )
             : const SizedBox.shrink(),
         _textOpened
             ? _TextPane(
@@ -314,26 +421,64 @@ class _PageStrip extends StatelessWidget {
 }
 
 class _PdfPane extends StatelessWidget {
-  const _PdfPane({required this.path, required this.pageNo, required this.controller});
+  const _PdfPane({
+    required this.path,
+    required this.pageNo,
+    required this.controller,
+    this.progress,
+    this.currentPage = 0,
+    this.total = 0,
+  });
 
   final String? path;
   final int pageNo;
   final PdfViewerController controller;
+  final double? progress;
+  final int currentPage;
+  final int total;
 
   @override
   Widget build(BuildContext context) {
     final file = path;
     if (file == null || !File(file).existsSync()) {
+      if (progress != null) {
+        return Center(
+          child: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('正在下载本期…', style: TextStyle(color: AppColors.text2)),
+                const SizedBox(height: 6),
+                Text(
+                  '第 $currentPage 版 · $total 版',
+                  style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                ),
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 5,
+                    backgroundColor: AppColors.border,
+                    valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.picture_as_pdf_outlined, size: 34, color: AppColors.text2),
             SizedBox(height: 10),
-            Text('本期尚未下载，无法按 PDF 阅读', style: TextStyle(color: AppColors.text2)),
+            Text('本期 PDF 未就绪', style: TextStyle(color: AppColors.text2)),
             SizedBox(height: 4),
             Text(
-              '可以先看「文字」模式，或回书架下载本期',
+              '可以先看「文字」模式',
               style: TextStyle(fontSize: 12, color: AppColors.text2),
             ),
           ],

@@ -133,6 +133,9 @@ void main() {
     await tester.tap(find.text('PDF'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('本期尚未下载'), findsOneWidget);
+    // 未下载切换到 PDF：先弹窗询问是否下载
+    expect(find.text('本期还没下载'), findsOneWidget);
+    expect(find.text('下载本期'), findsOneWidget);
+    expect(find.text('先看文字'), findsOneWidget);
   });
 }
