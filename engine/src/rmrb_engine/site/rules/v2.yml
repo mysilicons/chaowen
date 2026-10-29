@@ -1,0 +1,22 @@
+# 站点解析规则（新版 /pc/ 站点，2024-12-01 起）
+# 站点改版时优先只改这里，不改 Python 代码。
+
+layout:
+  # 版面列表：注意页面上 id="pageLink" 重复 20 次（非法 HTML），必须全取
+  page_list: 'div.swiper-slide a[id="pageLink"]'
+  # 当前版面标题："第01版：要闻"
+  page_label: "p.ban"
+  # PDF 下载链接（带 download 属性给出规范文件名）
+  pdf_link: 'div.paper-bot a[href$=".pdf"]'
+  # 版面缩略图 400x575
+  thumb: 'div.paper img[src$=".jpg.2"]'
+  # 本版新闻列表（文字模式入口）
+  articles: "div.news ul li a"
+  # 报纸日期："2026年10月29日 Thu"
+  date: "span.newstime"
+
+article:
+  title: "div.article h1"
+  subtitle: "div.article p.sec"
+  meta_comment: '<!--enpproperty([\s\S]*?)-->'
+  body: '<!--enpcontent-->([\s\S]*?)<!--/enpcontent-->'
