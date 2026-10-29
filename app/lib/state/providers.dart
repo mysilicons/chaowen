@@ -104,6 +104,12 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
         });
       case 'issue.archived':
         _update(jobId, (job) => job.status = 'archived');
+        // 下载完成后把书架、月历、阅读器状态全部作废，否则界面还显示"未下载"
+        if (date.isNotEmpty) {
+          ref.invalidate(issueProvider(date));
+          ref.invalidate(issueStatusProvider(date));
+          ref.invalidate(monthStatusProvider(date.substring(0, 7)));
+        }
       case 'job.finished':
         _update(jobId, (job) {
           final ok = event.data['ok'] == true;

@@ -209,7 +209,9 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
       width: collapsed ? 68 : 214,
       color: AppColors.surface,
       child: Column(
@@ -251,12 +253,13 @@ class _Sidebar extends StatelessWidget {
                   ),
                 IconButton(
                   onPressed: onToggle,
-                  icon: Icon(collapsed ? Icons.chevron_right : Icons.chevron_left, size: 18),
+                  icon: Icon(collapsed ? Icons.chevron_right : Icons.chevron_left),
+                  iconSize: collapsed ? 20 : 16,
                   color: AppColors.text2,
                   tooltip: collapsed ? '展开侧栏' : '收起侧栏',
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 ),
               ],
             ),
@@ -340,16 +343,23 @@ class _AboutButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: TextButton.icon(
-        onPressed: () => _show(context, ref),
-        icon: const Icon(Icons.settings_outlined, size: 15, color: AppColors.text2),
-        label: Text(
-          collapsed ? '' : '设置',
-          style: const TextStyle(fontSize: 12, color: AppColors.text2),
+    return InkWell(
+      onTap: () => _show(context, ref),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: collapsed ? 18 : 24, vertical: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.settings_outlined, size: 18, color: AppColors.text2),
+            if (!collapsed) ...[
+              const SizedBox(width: 10),
+              const Text(
+                '设置',
+                style: TextStyle(fontSize: 13, color: AppColors.text),
+              ),
+            ],
+          ],
         ),
-        style: TextButton.styleFrom(alignment: Alignment.centerLeft, padding: EdgeInsets.zero),
       ),
     );
   }
