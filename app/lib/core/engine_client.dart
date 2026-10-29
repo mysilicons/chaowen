@@ -25,6 +25,9 @@ class ProcessTransport implements EngineTransport {
 
   @override
   void write(String line) {
+    // 不显式设置的话，Windows 上 IOSink 会用系统代码页（GBK）编码，
+    // 而引擎按 UTF-8 解码，中文路径就成乱码了。
+    _process.stdin.encoding = utf8;
     _process.stdin.writeln(line);
   }
 

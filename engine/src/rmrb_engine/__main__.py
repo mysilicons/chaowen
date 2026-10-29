@@ -84,8 +84,10 @@ def _parse_pages(raw: str | None) -> list[int] | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    # Windows 控制台/管道默认可能不是 UTF-8，会把中文和 JSON 写坏。
-    for stream in (sys.stdout, sys.stderr):
+    # Windows 控制台/管道默认可能不是 UTF-8：
+    # 读请求（stdin）和写响应（stdout/stderr）都必须统一成 UTF-8，
+    # 否则中文路径会在 Dart ↔ Python 之间变成"浜烘皯鏃ユ姤"这种乱码。
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
 
