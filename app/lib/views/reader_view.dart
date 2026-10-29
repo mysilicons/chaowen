@@ -263,23 +263,33 @@ class _ReaderBar extends ConsumerWidget {
             style: TextStyle(fontSize: 13, color: context.colors.text2),
           ),
           const Spacer(),
+          // 字号控件在左、模式切换固定在最右：
+          // 切到 PDF 时字号控件隐藏，模式开关不会跟着跳。
+          SizedBox(
+            width: 132,
+            child: mode == 'text'
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _ScaleButton(
+                        label: 'A-',
+                        onTap: () => ref.read(readerScaleProvider.notifier).step(-0.1),
+                      ),
+                      _ScaleButton(
+                        label: 'A+',
+                        onTap: () => ref.read(readerScaleProvider.notifier).step(0.1),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${(scale * 100).round()}%',
+                        style: TextStyle(fontSize: 11, color: context.colors.text2),
+                      ),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 14),
           _ModeSwitch(mode: mode, onChanged: onMode),
-          const SizedBox(width: 16),
-          if (mode == 'text') ...[
-            _ScaleButton(
-              label: 'A-',
-              onTap: () => ref.read(readerScaleProvider.notifier).step(-0.1),
-            ),
-            _ScaleButton(
-              label: 'A+',
-              onTap: () => ref.read(readerScaleProvider.notifier).step(0.1),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${(scale * 100).round()}%',
-              style: TextStyle(fontSize: 11, color: context.colors.text2),
-            ),
-          ],
         ],
       ),
     );
@@ -316,7 +326,9 @@ class _ModeSwitch extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1EEE7),
+        color: context.colors.isDark
+            ? context.colors.paper
+            : const Color(0xFFF1EEE7),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Row(
@@ -336,7 +348,7 @@ class _ModeSwitch extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
+          color: selected ? context.colors.surface : Colors.transparent,
           borderRadius: BorderRadius.circular(5),
           boxShadow: selected
               ? const [
@@ -724,7 +736,9 @@ class _ArticleNav extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: const Color(0xFFF6F3EC),
+                color: context.colors.isDark
+                    ? context.colors.paper
+                    : const Color(0xFFF6F3EC),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: context.colors.border),
               ),
@@ -733,7 +747,7 @@ class _ArticleNav extends StatelessWidget {
                 children: [
                   Text(
                     '第 ${index + 1} / $total 篇',
-                    style: TextStyle(fontSize: 12, color: context.colors.text2),
+                    style: TextStyle(fontSize: 12, color: context.colors.text),
                   ),
                   const SizedBox(width: 4),
                   Icon(Icons.expand_more, size: 16, color: context.colors.text2),

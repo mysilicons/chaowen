@@ -132,6 +132,12 @@ ThemeData buildTheme(Brightness brightness) {
       brightness: brightness,
       surface: palette.surface,
     ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: const Color(0xFF2A2A2A),
+      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 13),
+      actionTextColor: palette.brand,
+      behavior: SnackBarBehavior.floating,
+    ),
     extensions: [palette],
   );
 }

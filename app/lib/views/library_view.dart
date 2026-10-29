@@ -71,39 +71,9 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
         Positioned(
           right: 26,
           bottom: 22,
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // 只有真正在下载时才画进度环：
-                // value 为 null 的 CircularProgressIndicator 是"无限转圈"，会让人以为一直在下载
-                if (running != null)
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: CircularProgressIndicator(
-                      value: running.progress,
-                      strokeWidth: 2.5,
-                      backgroundColor: context.colors.brand.withValues(alpha: 0.15),
-                      valueColor: AlwaysStoppedAnimation(context.colors.brand),
-                    ),
-                  ),
-                FloatingActionButton(
-                  onPressed: running == null ? () => _download(iso) : null,
-                  backgroundColor: context.colors.brand,
-                  foregroundColor: Colors.white,
-                  elevation: 2,
-                  mini: true,
-                  shape: const CircleBorder(),
-                  child: Icon(
-                    running == null ? Icons.download_outlined : Icons.downloading,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
+          child: _DownloadFab(
+            progress: running?.progress,
+            onTap: running == null ? () => _download(iso) : null,
           ),
         ),
     ]);
@@ -267,5 +237,56 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('下载失败：$e')));
     }
+  }
+}
+
+
+/// 圆形下载按钮。
+///
+/// 不用 FloatingActionButton：它的 disabled 态会把图标染成半透明灰，
+/// 在红色圆底上几乎看不见（用户反馈"点完只剩一个红圆"）。
+class _DownloadFab extends StatelessWidget {
+  const _DownloadFab({required this.progress, required this.onTap});
+
+  final double? progress;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SizedBox(
+      width: 48,
+      height: 48,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (progress != null)
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: CircularProgressIndicator(
+                value: progress,
+                strokeWidth: 2.5,
+                backgroundColor: c.brand.withValues(alpha: 0.15),
+                valueColor: AlwaysStoppedAnimation(c.brand),
+              ),
+            ),
+          Material(
+            color: c.brand,
+            shape: const CircleBorder(),
+            elevation: 2,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: const SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(Icons.download_outlined, size: 20, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

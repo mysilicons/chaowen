@@ -168,8 +168,10 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
   }
 
   Widget _preset(String label, int days) {
+    final c = context.colors;
     return ActionChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+      label: Text(label, style: TextStyle(fontSize: 12, color: c.text)),
+      labelStyle: TextStyle(fontSize: 12, color: c.text),
       onPressed: () {
         final now = DateTime.now();
         setState(() {
