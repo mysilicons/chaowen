@@ -1,0 +1,35 @@
+# ---- Python / 引擎 ----
+engine/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+engine/dist/
+engine/build/
+*.egg-info/
+
+# ---- Flutter / 应用 ----
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/windows/flutter/ephemeral/
+app/assets/engine/
+
+# ---- 字体：源文件不入库，子集入库 ----
+fonts/*.otf
+fonts/*.woff2
+fonts/SourceHanSerifSC-VF.ttf
+!fonts/subset/*.ttf
+
+# ---- 运行产物 ----
+*.log
+library/
+cache/
+state.db
+
+# ---- 系统 ----
+Thumbs.db
+Desktop.ini
+.DS_Store

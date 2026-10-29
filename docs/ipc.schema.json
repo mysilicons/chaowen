@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rmrb-reader.local/ipc.schema.json",
+  "title": "rmrb-reader IPC v1",
+  "description": "Flutter 应用与 Python 引擎之间的 NDJSON 协议（每行一条）",
+  "oneOf": [
+    { "$ref": "#/$defs/Request" },
+    { "$ref": "#/$defs/Response" },
+    { "$ref": "#/$defs/Event" }
+  ],
+  "$defs": {
+    "Request": {
+      "type": "object",
+      "required": ["id", "method"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "method": { "type": "string", "minLength": 1 },
+        "params": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "Response": {
+      "type": "object",
+      "required": ["id", "ok"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "ok": { "type": "boolean" },
+        "result": {},
+        "error": { "$ref": "#/$defs/Error" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "ok": { "const": true } } },
+          "then": { "required": ["result"] }
+        },
+        {
+          "if": { "properties": { "ok": { "const": false } } },
+          "then": { "required": ["error"] }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "NO_ISSUE",
+            "PARSE_ERROR",
+            "HTTP_ERROR",
+            "TIMEOUT",
+            "BAD_RESPONSE",
+            "CORRUPT",
+            "DISK_ERROR",
+            "MERGE_FAILED",
+            "CIRCUIT_OPEN",
+            "UNKNOWN_METHOD",
+            "BAD_REQUEST"
+          ]
+        },
+        "message": { "type": "string" },
+        "detail": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Event": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "download.progress",
+            "download.page",
+            "article.progress",
+            "issue.archived",
+            "job.finished"
+          ]
+        },
+        "data": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "ArticleRef": {
+      "type": "object",
+      "required": ["title", "url"],
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Page": {
+      "type": "object",
+      "required": ["no", "title", "url"],
+      "properties": {
+        "no": { "type": "integer", "minimum": 1, "maximum": 40 },
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "pdfUrl": { "type": ["string", "null"] },
+        "originalName": { "type": ["string", "null"] },
+        "thumbUrl": { "type": ["string", "null"] },
+        "articles": { "type": "array", "items": { "$ref": "#/$defs/ArticleRef" } }
+      },
+      "additionalProperties": false
+    },
+    "Issue": {
+      "type": "object",
+      "required": ["pageCount", "pages"],
+      "properties": {
+        "date": { "type": ["string", "null"], "format": "date" },
+        "pageCount": { "type": "integer", "minimum": 0 },
+        "sourceUrl": { "type": ["string", "null"] },
+        "pages": { "type": "array", "items": { "$ref": "#/$defs/Page" } }
+      },
+      "additionalProperties": false
+    },
+    "Block": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["p", "img"] },
+        "text": { "type": "string" },
+        "src": { "type": "string" },
+        "local": { "type": ["string", "null"] },
+        "caption": { "type": ["string", "null"] }
+      }
+    },
+    "Article": {
+      "type": "object",
+      "required": ["title", "url", "blocks"],
+      "properties": {
+        "title": { "type": "string" },
+        "author": { "type": ["string", "null"] },
+        "subtitle": { "type": ["string", "null"] },
+        "url": { "type": "string" },
+        "blocks": { "type": "array", "items": { "$ref": "#/$defs/Block" } }
+      }
+    },
+    "ArticlePage": {
+      "type": "object",
+      "required": ["date", "pageNo", "kind", "articles"],
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "pageNo": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["normal", "single", "image_only", "empty", "failed"]
+        },
+        "articles": { "type": "array", "items": { "$ref": "#/$defs/Article" } }
+      }
+    },
+    "Settings": {
+      "type": "object",
+      "properties": {
+        "downloadDir": { "type": "string" },
+        "autoMerge": { "type": "boolean" },
+        "deleteSinglesAfterMerge": { "type": "boolean" },
+        "speedProfile": { "type": "string", "enum": ["saver", "standard", "fast"] },
+        "theme": { "type": "string", "enum": ["light", "dark", "system"] },
+        "fontSize": { "type": "number", "minimum": 12, "maximum": 28 }
+      }
+    }
+  }
+}

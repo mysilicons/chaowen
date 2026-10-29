@@ -1,0 +1,50 @@
+[project]
+name = "rmrb-engine"
+version = "0.1.0"
+description = "人民日报阅报器的本地引擎：抓取、解析、合并"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "httpx>=0.27",
+    "selectolax>=0.3",
+    "pyyaml>=6.0",
+    "pypdf>=5.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "platformdirs>=4.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "respx>=0.21",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pyinstaller>=6.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rmrb_engine"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "network: 需要真实网络的测试（默认不跑）",
+]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
