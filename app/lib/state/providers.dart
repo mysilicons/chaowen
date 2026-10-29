@@ -146,6 +146,16 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
       state = state.where((job) => job.status == 'running').toList(growable: false);
 }
 
+/// 深色模式开关（本次运行内有效）
+final darkModeProvider = NotifierProvider<DarkMode, bool>(DarkMode.new);
+
+class DarkMode extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void toggle() => state = !state;
+}
+
 /// 左侧栏是否折叠
 final sidebarCollapsedProvider =
     NotifierProvider<SidebarCollapsed, bool>(SidebarCollapsed.new);

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/providers.dart';
-import '../theme/tokens.dart';
+import '../theme/palette.dart';
 
 /// 设置页：独立视图，替代原来的弹框。
 class SettingsView extends ConsumerWidget {
@@ -49,9 +49,21 @@ class SettingsView extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 '切换下载目录不会迁移已有文件；旧目录里的内容需要手动搬过去。',
-                style: TextStyle(fontSize: 11, height: 1.6, color: AppColors.text2),
+                style: TextStyle(fontSize: 11, height: 1.6, color: context.colors.text2),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _Section(
+            title: '外观',
+            children: [
+              _SwitchRow(
+                label: '深色模式',
+                hint: '夜间阅读更省眼，切换即时生效',
+                value: ref.watch(darkModeProvider),
+                onChanged: (_) => ref.read(darkModeProvider.notifier).toggle(),
               ),
             ],
           ),
@@ -70,10 +82,10 @@ class SettingsView extends ConsumerWidget {
               const SizedBox(height: 14),
               Row(
                 children: [
-                  const SizedBox(
+                  SizedBox(
                     width: 76,
                     child: Text('正文字号',
-                        style: TextStyle(fontSize: 12, color: AppColors.text2)),
+                        style: TextStyle(fontSize: 12, color: context.colors.text2)),
                   ),
                   Expanded(
                     child: Slider(
@@ -82,7 +94,7 @@ class SettingsView extends ConsumerWidget {
                       max: 1.5,
                       divisions: 13,
                       label: '${(ref.watch(readerScaleProvider) * 100).round()}%',
-                      activeColor: AppColors.brand,
+                      activeColor: context.colors.brand,
                       onChanged: (value) => ref
                           .read(readerScaleProvider.notifier)
                           .step(value - ref.read(readerScaleProvider)),
@@ -114,10 +126,10 @@ class SettingsView extends ConsumerWidget {
               ),
               _Row(label: '协议', value: 'IPC v${hello.value?['protocol'] ?? '—'}'),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 '仅供个人学习研究使用，请勿用于商业目的或对外分发。\n'
                 '《人民日报》（电子版）版权归人民网股份有限公司所有。',
-                style: TextStyle(fontSize: 11, height: 1.7, color: AppColors.text2),
+                style: TextStyle(fontSize: 11, height: 1.7, color: context.colors.text2),
               ),
             ],
           ),
@@ -175,16 +187,16 @@ class _SwitchRow extends StatelessWidget {
       children: [
         SizedBox(
           width: 76,
-          child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+          child: Text(label, style: TextStyle(fontSize: 12, color: context.colors.text2)),
         ),
         Expanded(
-          child: Text(hint, style: const TextStyle(fontSize: 11, color: AppColors.text2)),
+          child: Text(hint, style: TextStyle(fontSize: 11, color: context.colors.text2)),
         ),
         Switch(
           value: value,
           onChanged: onChanged,
           activeThumbColor: Colors.white,
-          activeTrackColor: AppColors.brand,
+          activeTrackColor: context.colors.brand,
         ),
       ],
     );
@@ -203,19 +215,19 @@ class _Section extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.text,
+              color: context.colors.text,
             ),
           ),
           const SizedBox(height: 14),
@@ -240,7 +252,7 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 76,
-          child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+          child: Text(label, style: TextStyle(fontSize: 12, color: context.colors.text2)),
         ),
         Expanded(
           child: SelectableText(

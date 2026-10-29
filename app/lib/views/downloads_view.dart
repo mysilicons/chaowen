@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/providers.dart';
-import '../theme/tokens.dart';
+import '../theme/palette.dart';
 
 class DownloadsView extends ConsumerStatefulWidget {
   const DownloadsView({super.key});
@@ -70,23 +70,23 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
                     const SizedBox(width: 12),
                     Text(
                       '${_single.year}年${_single.month}月${_single.day}日',
-                      style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                      style: TextStyle(fontSize: 12, color: context.colors.text2),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    const Icon(Icons.speed, size: 16, color: AppColors.text2),
+                    Icon(Icons.speed, size: 16, color: context.colors.text2),
                     const SizedBox(width: 6),
-                    const Text(
+                    Text(
                       '低速模式：1 并发 · 1 秒间隔（硬性上限 2）',
-                      style: TextStyle(fontSize: 12, color: AppColors.text2),
+                      style: TextStyle(fontSize: 12, color: context.colors.text2),
                     ),
                     const Spacer(),
                     FilledButton(
                       onPressed: () => _startSingle(context, isoDate(_single)),
-                      style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
+                      style: FilledButton.styleFrom(backgroundColor: context.colors.brand),
                       child: const Text('开始下载'),
                     ),
                   ],
@@ -121,12 +121,12 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
                     Expanded(
                       child: Text(
                         '$_days 天 · 约 ${(_days * 63)} MB · 约 ${(_days * 45 / 60).ceil()} 分钟',
-                        style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                        style: TextStyle(fontSize: 12, color: context.colors.text2),
                       ),
                     ),
                     FilledButton(
                       onPressed: _days > 0 ? () => _startBatch(context) : null,
-                      style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
+                      style: FilledButton.styleFrom(backgroundColor: context.colors.brand),
                       child: const Text('加入队列'),
                     ),
                   ],
@@ -139,7 +139,7 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
             children: [
               const Text('队列', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(width: 8),
-              Text('${jobs.length}', style: const TextStyle(color: AppColors.text2)),
+              Text('${jobs.length}', style: TextStyle(color: context.colors.text2)),
               const Spacer(),
               TextButton(
                 onPressed: () => ref.read(queueProvider.notifier).clearFinished(),
@@ -149,10 +149,10 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
           ),
           const SizedBox(height: 4),
           if (jobs.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
               child: Center(
-                child: Text('暂无任务', style: TextStyle(color: AppColors.text2)),
+                child: Text('暂无任务', style: TextStyle(color: context.colors.text2)),
               ),
             )
           else
@@ -183,7 +183,7 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
         });
       },
       backgroundColor: const Color(0xFFF6F3EC),
-      side: const BorderSide(color: AppColors.border),
+      side: BorderSide(color: context.colors.border),
     );
   }
 
@@ -202,13 +202,13 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: context.colors.border),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('$label ', style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+            Text('$label ', style: TextStyle(fontSize: 12, color: context.colors.text2)),
             Text(isoDate(value), style: const TextStyle(fontSize: 13)),
           ],
         ),
@@ -286,17 +286,17 @@ class _JobTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: failed
-                      ? AppColors.brandHover
+                      ? context.colors.brandHover
                       : finished
-                      ? AppColors.success
-                      : AppColors.text2,
+                      ? context.colors.success
+                      : context.colors.text2,
                 ),
               ),
               const Spacer(),
               if (job.error != null)
                 Text(
                   job.error!,
-                  style: const TextStyle(fontSize: 11, color: AppColors.brandHover),
+                  style: TextStyle(fontSize: 11, color: context.colors.brandHover),
                 ),
             ],
           ),
@@ -306,9 +306,9 @@ class _JobTile extends StatelessWidget {
             child: LinearProgressIndicator(
               value: job.progress,
               minHeight: 5,
-              backgroundColor: AppColors.border,
+              backgroundColor: context.colors.border,
               valueColor: AlwaysStoppedAnimation(
-                failed ? AppColors.brandHover : AppColors.brand,
+                failed ? context.colors.brandHover : context.colors.brand,
               ),
             ),
           ),
@@ -328,9 +328,9 @@ class _Card extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
       ),
       child: child,
     );
@@ -347,7 +347,7 @@ class _LibraryPath extends ConsumerWidget {
       path == null ? '' : '下载到：$path',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 11, color: AppColors.text2),
+      style: TextStyle(fontSize: 11, color: context.colors.text2),
     );
   }
 }

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
 import '../state/providers.dart';
-import '../theme/tokens.dart';
+import '../theme/palette.dart';
 
 /// 版面缩略图卡片：图上、版号角标。
 class PageThumb extends ConsumerWidget {
@@ -68,7 +68,7 @@ class PageThumb extends ConsumerWidget {
             page.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: AppColors.text2),
+            style: TextStyle(fontSize: 12, color: context.colors.text2),
           ),
         ],
       ),
@@ -111,7 +111,7 @@ class _ThumbPlaceholder extends StatelessWidget {
     return Container(
       color: const Color(0xFFF1EEE7),
       alignment: Alignment.center,
-      child: const Icon(Icons.article_outlined, size: 20, color: AppColors.text2),
+      child: Icon(Icons.article_outlined, size: 20, color: context.colors.text2),
     );
   }
 }

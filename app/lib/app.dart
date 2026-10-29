@@ -4,23 +4,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/engine_client.dart';
 import 'core/models.dart';
 import 'state/providers.dart';
-import 'theme/tokens.dart';
+import 'theme/palette.dart';
 import 'views/downloads_view.dart';
 import 'views/library_view.dart';
 import 'views/settings_view.dart';
 import 'views/reader_view.dart';
 
-class RmrbApp extends StatelessWidget {
+class RmrbApp extends ConsumerWidget {
   const RmrbApp({super.key, required this.engine});
 
   final EngineClient engine;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dark = ref.watch(darkModeProvider);
     return MaterialApp(
       title: '朝闻',
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: dark ? ThemeMode.dark : ThemeMode.light,
       home: BootstrapGate(engine: engine),
     );
   }
@@ -76,7 +79,7 @@ class _BootstrapGateState extends State<BootstrapGate> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 36, color: AppColors.brandHover),
+            Icon(Icons.error_outline, size: 36, color: context.colors.brandHover),
             const SizedBox(height: 14),
             const Text(
               '引擎启动失败',
@@ -88,13 +91,13 @@ class _BootstrapGateState extends State<BootstrapGate> {
               child: Text(
                 widget.engine.lastError ?? '未知错误',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                style: TextStyle(fontSize: 12, color: context.colors.text2),
               ),
             ),
             const SizedBox(height: 18),
             FilledButton(
               onPressed: _bootstrap,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
+              style: FilledButton.styleFrom(backgroundColor: context.colors.brand),
               child: const Text('重试'),
             ),
           ],
@@ -102,7 +105,7 @@ class _BootstrapGateState extends State<BootstrapGate> {
       );
     }
 
-    return const _Splash(
+    return _Splash(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -112,7 +115,7 @@ class _BootstrapGateState extends State<BootstrapGate> {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           SizedBox(height: 16),
-          Text('正在启动引擎…', style: TextStyle(fontSize: 13, color: AppColors.text2)),
+          Text('正在启动引擎…', style: TextStyle(fontSize: 13, color: context.colors.text2)),
         ],
       ),
     );
@@ -127,30 +130,30 @@ class _Splash extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: context.colors.paper,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
+            Text(
               '人民日报',
               style: TextStyle(
                 fontFamily: AppFonts.serif,
                   fontFamilyFallback: AppFonts.fallback,
                 fontSize: 34,
                 fontWeight: FontWeight.w700,
-                color: AppColors.brand,
+                color: context.colors.brand,
                 letterSpacing: 4,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               '朝闻',
               style: TextStyle(
                 fontFamily: AppFonts.serif,
                   fontFamilyFallback: AppFonts.fallback,
                 fontSize: 13,
-                color: AppColors.text2,
+                color: context.colors.text2,
                 letterSpacing: 6,
               ),
             ),
@@ -171,7 +174,7 @@ class HomeShell extends ConsumerWidget {
     final index = ref.watch(shellIndexProvider);
     final collapsed = ref.watch(sidebarCollapsedProvider);
     return Scaffold(
-      backgroundColor: AppColors.paper,
+      backgroundColor: context.colors.paper,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -181,7 +184,7 @@ class HomeShell extends ConsumerWidget {
             onSelect: (value) => ref.read(shellIndexProvider.notifier).select(value),
             onToggle: () => ref.read(sidebarCollapsedProvider.notifier).toggle(),
           ),
-          const VerticalDivider(width: 1, color: AppColors.border),
+          VerticalDivider(width: 1, color: context.colors.border),
           Expanded(
             child: IndexedStack(
               index: index,
@@ -213,7 +216,7 @@ class _Sidebar extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
       width: collapsed ? 68 : 214,
-      color: AppColors.surface,
+      color: context.colors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -223,7 +226,7 @@ class _Sidebar extends StatelessWidget {
               mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
                 if (!collapsed)
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -234,7 +237,7 @@ class _Sidebar extends StatelessWidget {
                             fontFamilyFallback: AppFonts.fallback,
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.brand,
+                            color: context.colors.brand,
                             letterSpacing: 2,
                           ),
                         ),
@@ -245,7 +248,7 @@ class _Sidebar extends StatelessWidget {
                             fontFamily: AppFonts.serif,
                             fontFamilyFallback: AppFonts.fallback,
                             fontSize: 11,
-                            color: AppColors.text2,
+                            color: context.colors.text2,
                             letterSpacing: 2,
                           ),
                         ),
@@ -256,7 +259,7 @@ class _Sidebar extends StatelessWidget {
                   onPressed: onToggle,
                   icon: Icon(collapsed ? Icons.chevron_right : Icons.chevron_left),
                   iconSize: collapsed ? 20 : 16,
-                  color: AppColors.text2,
+                  color: context.colors.text2,
                   tooltip: collapsed ? '展开侧栏' : '收起侧栏',
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
@@ -280,11 +283,11 @@ class _Sidebar extends StatelessWidget {
           const Spacer(),
           _AboutButton(collapsed: collapsed),
           if (!collapsed)
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(22, 8, 22, 20),
               child: Text(
                 '个人存档 · 低速访问\n仅限学习研究使用',
-                style: TextStyle(fontSize: 11, height: 1.6, color: AppColors.text2),
+                style: TextStyle(fontSize: 11, height: 1.6, color: context.colors.text2),
               ),
             ),
         ],
@@ -314,18 +317,18 @@ class _NavItem extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
-          color: selected ? AppColors.brand.withValues(alpha: 0.08) : Colors.transparent,
+          color: selected ? context.colors.brand.withValues(alpha: 0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: selected ? AppColors.brand : AppColors.text2),
+            Icon(icon, size: 18, color: selected ? context.colors.brand : context.colors.text2),
             const SizedBox(width: 10),
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
-                color: selected ? AppColors.brand : AppColors.text,
+                color: selected ? context.colors.brand : context.colors.text,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -351,10 +354,10 @@ class _AboutButton extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.settings_outlined, size: 18, color: AppColors.text2),
+            Icon(Icons.settings_outlined, size: 18, color: context.colors.text2),
             if (!collapsed) ...[
               const SizedBox(width: 10),
-              const Text('设置', style: TextStyle(fontSize: 13, color: AppColors.text)),
+              Text('设置', style: TextStyle(fontSize: 13, color: context.colors.text)),
             ],
           ],
         ),

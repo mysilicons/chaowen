@@ -7,7 +7,7 @@ import 'package:pdfrx/pdfrx.dart';
 
 import '../core/models.dart';
 import '../state/providers.dart';
-import '../theme/tokens.dart';
+import '../theme/palette.dart';
 
 class ReaderView extends ConsumerStatefulWidget {
   const ReaderView({super.key});
@@ -45,7 +45,7 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
     final accepted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.paper,
+        backgroundColor: context.colors.paper,
         title: const Text(
           '本期还没下载',
           style: TextStyle(fontFamily: AppFonts.serif, fontFamilyFallback: AppFonts.fallback),
@@ -61,7 +61,7 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
+            style: FilledButton.styleFrom(backgroundColor: context.colors.brand),
             child: const Text('下载本期'),
           ),
         ],
@@ -102,8 +102,8 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
   Widget build(BuildContext context) {
     final target = ref.watch(readerTargetProvider);
     if (target == null) {
-      return const Center(
-        child: Text('从书架选择一版开始阅读', style: TextStyle(color: AppColors.text2)),
+      return Center(
+        child: Text('从书架选择一版开始阅读', style: TextStyle(color: context.colors.text2)),
       );
     }
 
@@ -136,7 +136,7 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
           onMode: (value) => ref.read(readerModeProvider.notifier).select(value),
           onBack: () => ref.read(shellIndexProvider.notifier).select(0),
         ),
-        const Divider(height: 1, color: AppColors.border),
+        Divider(height: 1, color: context.colors.border),
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -151,7 +151,7 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
                   }
                 },
               ),
-              const VerticalDivider(width: 1, color: AppColors.border),
+              VerticalDivider(width: 1, color: context.colors.border),
               Expanded(
                 child: _body(
                   target.date,
@@ -244,7 +244,7 @@ class _ReaderBar extends ConsumerWidget {
           IconButton(
             onPressed: onBack,
             icon: const Icon(Icons.arrow_back_ios_new, size: 16),
-            color: AppColors.text2,
+            color: context.colors.text2,
             tooltip: '返回书架',
           ),
           const SizedBox(width: 4),
@@ -260,7 +260,7 @@ class _ReaderBar extends ConsumerWidget {
           const SizedBox(width: 10),
           Text(
             '第${pageNo.toString().padLeft(2, '0')}版 · $title',
-            style: const TextStyle(fontSize: 13, color: AppColors.text2),
+            style: TextStyle(fontSize: 13, color: context.colors.text2),
           ),
           const Spacer(),
           _ModeSwitch(mode: mode, onChanged: onMode),
@@ -277,7 +277,7 @@ class _ReaderBar extends ConsumerWidget {
             const SizedBox(width: 8),
             Text(
               '${(scale * 100).round()}%',
-              style: const TextStyle(fontSize: 11, color: AppColors.text2),
+              style: TextStyle(fontSize: 11, color: context.colors.text2),
             ),
           ],
         ],
@@ -299,7 +299,7 @@ class _ScaleButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(4),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+        child: Text(label, style: TextStyle(fontSize: 12, color: context.colors.text2)),
       ),
     );
   }
@@ -322,14 +322,14 @@ class _ModeSwitch extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _segment('pdf', 'PDF', mode == 'pdf'),
-          _segment('text', '文字', mode == 'text'),
+          _segment(context, 'pdf', 'PDF', mode == 'pdf'),
+          _segment(context, 'text', '文字', mode == 'text'),
         ],
       ),
     );
   }
 
-  Widget _segment(String value, String label, bool selected) {
+  Widget _segment(BuildContext context, String value, String label, bool selected) {
     return InkWell(
       onTap: () => onChanged(value),
       borderRadius: BorderRadius.circular(5),
@@ -349,7 +349,7 @@ class _ModeSwitch extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            color: selected ? AppColors.text : AppColors.text2,
+            color: selected ? context.colors.text : context.colors.text2,
           ),
         ),
       ),
@@ -383,11 +383,11 @@ class _PageStrip extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: selected ? AppColors.brand.withValues(alpha: 0.10) : Colors.transparent,
+                color: selected ? context.colors.brand.withValues(alpha: 0.10) : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border(
                   left: BorderSide(
-                    color: selected ? AppColors.brand : Colors.transparent,
+                    color: selected ? context.colors.brand : Colors.transparent,
                     width: 3,
                   ),
                 ),
@@ -399,7 +399,7 @@ class _PageStrip extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                      color: selected ? AppColors.brand : AppColors.text,
+                      color: selected ? context.colors.brand : context.colors.text,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -407,7 +407,7 @@ class _PageStrip extends StatelessWidget {
                     page.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, color: AppColors.text2),
+                    style: TextStyle(fontSize: 10, color: context.colors.text2),
                   ),
                 ],
               ),
@@ -448,11 +448,11 @@ class _PdfPane extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('正在下载本期…', style: TextStyle(color: AppColors.text2)),
+                Text('正在下载本期…', style: TextStyle(color: context.colors.text2)),
                 const SizedBox(height: 6),
                 Text(
                   '第 $currentPage 版 · $total 版',
-                  style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                  style: TextStyle(fontSize: 12, color: context.colors.text2),
                 ),
                 const SizedBox(height: 14),
                 ClipRRect(
@@ -460,8 +460,8 @@ class _PdfPane extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 5,
-                    backgroundColor: AppColors.border,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                    backgroundColor: context.colors.border,
+                    valueColor: AlwaysStoppedAnimation(context.colors.brand),
                   ),
                 ),
               ],
@@ -469,17 +469,17 @@ class _PdfPane extends StatelessWidget {
           ),
         );
       }
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.picture_as_pdf_outlined, size: 34, color: AppColors.text2),
+            Icon(Icons.picture_as_pdf_outlined, size: 34, color: context.colors.text2),
             SizedBox(height: 10),
-            Text('本期 PDF 未就绪', style: TextStyle(color: AppColors.text2)),
+            Text('本期 PDF 未就绪', style: TextStyle(color: context.colors.text2)),
             SizedBox(height: 4),
             Text(
               '可以先看「文字」模式',
-              style: TextStyle(fontSize: 12, color: AppColors.text2),
+              style: TextStyle(fontSize: 12, color: context.colors.text2),
             ),
           ],
         ),
@@ -582,16 +582,16 @@ class _TextPaneState extends ConsumerState<_TextPane> {
 
   Widget _imageOnlyBanner() {
     return Container(
-      color: AppColors.gold.withValues(alpha: 0.12),
+      color: context.colors.gold.withValues(alpha: 0.12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          const Icon(Icons.image_outlined, size: 16, color: AppColors.gold),
+          Icon(Icons.image_outlined, size: 16, color: context.colors.gold),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               '本版以图片为主，文字内容较少',
-              style: TextStyle(fontSize: 12, color: AppColors.text2),
+              style: TextStyle(fontSize: 12, color: context.colors.text2),
             ),
           ),
           TextButton(
@@ -636,14 +636,14 @@ class _TextPaneState extends ConsumerState<_TextPane> {
                     fontSize: 22 * scale,
                     fontWeight: FontWeight.w700,
                     height: 1.5,
-                    color: AppColors.text,
+                    color: context.colors.text,
                   ),
                 ),
                 if (article.author != null && article.author!.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
                     article.author!,
-                    style: TextStyle(fontSize: 12 * scale, color: AppColors.text2),
+                    style: TextStyle(fontSize: 12 * scale, color: context.colors.text2),
                   ),
                 ],
                 const SizedBox(height: 20),
@@ -660,7 +660,7 @@ class _TextPaneState extends ConsumerState<_TextPane> {
                   fontFamilyFallback: AppFonts.fallback,
                           fontSize: 17 * scale,
                           height: 1.9,
-                          color: AppColors.text,
+                          color: context.colors.text,
                         ),
                       ),
                     ),
@@ -707,8 +707,8 @@ class _ArticleNav extends StatelessWidget {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.colors.border)),
       ),
       child: Row(
         children: [
@@ -726,17 +726,17 @@ class _ArticleNav extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFF6F3EC),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: context.colors.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     '第 ${index + 1} / $total 篇',
-                    style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                    style: TextStyle(fontSize: 12, color: context.colors.text2),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.expand_more, size: 16, color: AppColors.text2),
+                  Icon(Icons.expand_more, size: 16, color: context.colors.text2),
                 ],
               ),
             ),
@@ -758,7 +758,7 @@ class _ArticleNav extends StatelessWidget {
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.28),
       builder: (dialogContext) => Dialog(
-        backgroundColor: AppColors.paper,
+        backgroundColor: context.colors.paper,
         insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: ConstrainedBox(
@@ -783,32 +783,32 @@ class _ArticleNav extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       '共 $total 篇',
-                      style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                      style: TextStyle(fontSize: 12, color: context.colors.text2),
                     ),
                     const Spacer(),
                     IconButton(
                       onPressed: () => Navigator.of(dialogContext).pop(),
                       icon: const Icon(Icons.close, size: 18),
-                      color: AppColors.text2,
+                      color: context.colors.text2,
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),
               ),
-              const Divider(height: 1, color: AppColors.border),
+              Divider(height: 1, color: context.colors.border),
               Flexible(
                 child: ListView.separated(
                   padding: EdgeInsets.zero,
                   itemCount: titles.length,
                   separatorBuilder: (_, _) =>
-                      const Divider(height: 1, color: AppColors.border),
+                      Divider(height: 1, color: context.colors.border),
                   itemBuilder: (context, i) {
                     final active = i == index;
                     return InkWell(
                       onTap: () => Navigator.of(dialogContext).pop(i),
                       child: Container(
                         color: active
-                            ? AppColors.brand.withValues(alpha: 0.06)
+                            ? context.colors.brand.withValues(alpha: 0.06)
                             : Colors.transparent,
                         padding: const EdgeInsets.fromLTRB(22, 15, 18, 15),
                         child: Row(
@@ -821,7 +821,7 @@ class _ArticleNav extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                                  color: active ? AppColors.brand : AppColors.text2,
+                                  color: active ? context.colors.brand : context.colors.text2,
                                 ),
                               ),
                             ),
@@ -833,15 +833,15 @@ class _ArticleNav extends StatelessWidget {
                                   fontFamilyFallback: AppFonts.fallback,
                                   fontSize: 14,
                                   height: 1.5,
-                                  color: AppColors.text,
+                                  color: context.colors.text,
                                   fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                                 ),
                               ),
                             ),
                             if (active)
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.only(left: 8),
-                                child: Icon(Icons.check, size: 15, color: AppColors.brand),
+                                child: Icon(Icons.check, size: 15, color: context.colors.brand),
                               ),
                           ],
                         ),
@@ -872,12 +872,12 @@ class _Message extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 32, color: AppColors.text2),
+          Icon(icon, size: 32, color: context.colors.text2),
           const SizedBox(height: 12),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppColors.text2),
+            style: TextStyle(fontSize: 13, color: context.colors.text2),
           ),
           if (action != null) ...[const SizedBox(height: 12), action!],
         ],

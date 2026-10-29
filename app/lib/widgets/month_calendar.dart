@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
 import '../state/providers.dart';
-import '../theme/tokens.dart';
+import '../theme/palette.dart';
 
 /// 月历：每格显示归档状态点。
 class MonthCalendar extends ConsumerWidget {
@@ -34,7 +34,7 @@ class MonthCalendar extends ConsumerWidget {
                 child: Center(
                   child: Text(
                     label,
-                    style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                    style: TextStyle(fontSize: 12, color: context.colors.text2),
                   ),
                 ),
               ),
@@ -91,7 +91,7 @@ class MonthCalendar extends ConsumerWidget {
         height: 34,
         margin: const EdgeInsets.all(1.5),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.brand : Colors.transparent,
+          color: isSelected ? context.colors.brand : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: isSelected ? null : Border.all(color: Colors.transparent),
         ),
@@ -105,25 +105,25 @@ class MonthCalendar extends ConsumerWidget {
                 color: isSelected
                     ? Colors.white
                     : future
-                    ? AppColors.border
-                    : AppColors.text,
+                    ? context.colors.border
+                    : context.colors.text,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
             const SizedBox(height: 2),
-            _dot(status?.state, isSelected),
+            _dot(context, status?.state, isSelected),
           ],
         ),
       ),
     );
   }
 
-  Widget _dot(DayState? state, bool isSelected) {
+  Widget _dot(BuildContext context, DayState? state, bool isSelected) {
     final color = switch (state) {
-      DayState.archived => isSelected ? Colors.white : AppColors.success,
-      DayState.partial => isSelected ? Colors.white70 : AppColors.gold,
-      DayState.downloading => isSelected ? Colors.white70 : AppColors.brand,
-      DayState.failed => isSelected ? Colors.white70 : AppColors.brandHover,
+      DayState.archived => isSelected ? Colors.white : context.colors.success,
+      DayState.partial => isSelected ? Colors.white70 : context.colors.gold,
+      DayState.downloading => isSelected ? Colors.white70 : context.colors.brand,
+      DayState.failed => isSelected ? Colors.white70 : context.colors.brandHover,
       _ => Colors.transparent,
     };
     return Container(

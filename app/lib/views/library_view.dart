@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
 import '../state/providers.dart';
-import '../theme/tokens.dart';
+import '../theme/palette.dart';
 import '../widgets/month_calendar.dart';
 import '../widgets/page_thumb.dart';
 
@@ -45,24 +45,24 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
         ),
         if (!_calendarOpen) _weekStrip(date, statuses),
         const SizedBox(height: 4),
-        const Divider(height: 1, color: AppColors.border),
+        Divider(height: 1, color: context.colors.border),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 6),
           child: Row(children: [
             Text(
               '${date.year}年${date.month}月${date.day}日 星期${_wd[date.weekday - 1]}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: AppFonts.serif,
                 fontFamilyFallback: AppFonts.fallback,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.text,
+                color: context.colors.text,
               ),
             ),
             const SizedBox(width: 10),
             if (issue.value != null)
               Text('· ${issue.value!.pageCount} 版',
-                  style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+                  style: TextStyle(fontSize: 12, color: context.colors.text2)),
           ]),
         ),
         Expanded(child: _grid(iso, issue)),
@@ -86,13 +86,13 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
                     child: CircularProgressIndicator(
                       value: running.progress,
                       strokeWidth: 2.5,
-                      backgroundColor: AppColors.brand.withValues(alpha: 0.15),
-                      valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                      backgroundColor: context.colors.brand.withValues(alpha: 0.15),
+                      valueColor: AlwaysStoppedAnimation(context.colors.brand),
                     ),
                   ),
                 FloatingActionButton(
                   onPressed: running == null ? () => _download(iso) : null,
-                  backgroundColor: AppColors.brand,
+                  backgroundColor: context.colors.brand,
                   foregroundColor: Colors.white,
                   elevation: 2,
                   mini: true,
@@ -125,7 +125,7 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
             icon: Icon(_calendarOpen ? Icons.expand_less : Icons.expand_more, size: 18),
             label: Text(_calendarOpen ? '收起月历' : '选择日期',
                 style: const TextStyle(fontSize: 12)),
-            style: TextButton.styleFrom(foregroundColor: AppColors.text2),
+            style: TextButton.styleFrom(foregroundColor: context.colors.text2),
           ),
           TextButton(
             onPressed: () {
@@ -168,7 +168,7 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
         borderRadius: BorderRadius.circular(6),
         child: Padding(
           padding: const EdgeInsets.all(6),
-          child: Icon(icon, size: 18, color: AppColors.text2),
+          child: Icon(icon, size: 18, color: context.colors.text2),
         ),
       );
 
@@ -183,10 +183,10 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
         height: 44,
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.brand : Colors.transparent,
+          color: isSelected ? context.colors.brand : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-              color: isToday && !isSelected ? AppColors.brand : Colors.transparent),
+              color: isToday && !isSelected ? context.colors.brand : Colors.transparent),
         ),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(_wd[day.weekday - 1],
@@ -195,8 +195,8 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
                   color: isSelected
                       ? Colors.white70
                       : future
-                          ? AppColors.border
-                          : AppColors.text2)),
+                          ? context.colors.border
+                          : context.colors.text2)),
           const SizedBox(height: 1),
           Text('${day.day}',
               style: TextStyle(
@@ -205,8 +205,8 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
                   color: isSelected
                       ? Colors.white
                       : future
-                          ? AppColors.border
-                          : AppColors.text)),
+                          ? context.colors.border
+                          : context.colors.text)),
           const SizedBox(height: 1),
           Container(
             width: 3,
@@ -214,7 +214,7 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: status?.state == DayState.archived
-                  ? (isSelected ? Colors.white : AppColors.success)
+                  ? (isSelected ? Colors.white : context.colors.success)
                   : Colors.transparent,
             ),
           ),
@@ -228,11 +228,11 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
         error: (e, _) => Center(
           child: Text('无法获取该日版面\n$e',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+              style: TextStyle(fontSize: 12, color: context.colors.text2)),
         ),
         data: (data) => data.pages.isEmpty
-            ? const Center(
-                child: Text('该日期没有版面', style: TextStyle(color: AppColors.text2)))
+            ? Center(
+                child: Text('该日期没有版面', style: TextStyle(color: context.colors.text2)))
             : LayoutBuilder(builder: (context, c) {
                 final columns = (c.maxWidth / 150).floor().clamp(3, 8);
                 return GridView.builder(
