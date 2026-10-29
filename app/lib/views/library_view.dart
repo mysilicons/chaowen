@@ -77,18 +77,19 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: CircularProgressIndicator(
-                    value: running?.progress,
-                    strokeWidth: 2.5,
-                    backgroundColor: running == null
-                        ? Colors.transparent
-                        : AppColors.brand.withValues(alpha: 0.15),
-                    valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                // 只有真正在下载时才画进度环：
+                // value 为 null 的 CircularProgressIndicator 是"无限转圈"，会让人以为一直在下载
+                if (running != null)
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: CircularProgressIndicator(
+                      value: running.progress,
+                      strokeWidth: 2.5,
+                      backgroundColor: AppColors.brand.withValues(alpha: 0.15),
+                      valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                    ),
                   ),
-                ),
                 FloatingActionButton(
                   onPressed: running == null ? () => _download(iso) : null,
                   backgroundColor: AppColors.brand,
