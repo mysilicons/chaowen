@@ -41,5 +41,8 @@ class LibraryPaths:
     def text_json(self, d: Date, page_no: int) -> Path:
         return self.cache / "text" / d.isoformat() / f"{page_no:02d}.json"
 
+    def thumb_file(self, d: Date, page_no: int) -> Path:
+        return self.cache / "thumbs" / d.isoformat() / f"{page_no:02d}.jpg"
+
     def image_cache(self, filename: str) -> Path:
         return self.cache / "img" / filename

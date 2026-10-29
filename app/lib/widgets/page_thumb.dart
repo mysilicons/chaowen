@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -74,6 +76,14 @@ class PageThumb extends ConsumerWidget {
   }
 
   Widget _image(WidgetRef ref) {
+    final local = page.thumbLocal;
+    if (local != null && File(local).existsSync()) {
+      return Image.file(
+        File(local),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => const _ThumbPlaceholder(),
+      );
+    }
     final direct = page.thumbUrl;
     final String? url;
     if (direct != null && direct.isNotEmpty) {

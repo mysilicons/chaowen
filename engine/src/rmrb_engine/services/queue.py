@@ -194,6 +194,7 @@ class DownloadService:
                 size=result.bytes,
                 sha256=_sha256(dest),
             )
+            self._cache_thumb(d, page)
             self.emit(
                 "download.page",
                 {
@@ -212,6 +213,7 @@ class DownloadService:
                 error_code=exc.code.value,
                 bump_attempts=True,
             )
+            self._cache_thumb(d, page)
             self.emit(
                 "download.page",
                 {
@@ -224,6 +226,22 @@ class DownloadService:
             return PageOutcome(
                 no=page.no, title=page.title, status="failed", error=exc.code.value
             )
+
+    def _cache_thumb(self, d: Date, page: Page) -> None:
+        """顺手把版面缩略图存到本地，书架就不必再逐张联网。"""
+        if not page.thumb_url:
+            return
+        target = self.paths.thumb_file(d, page.no)
+        if target.exists() and target.stat().st_size > 1024:
+            page.thumb_local = str(target)
+            return
+        try:
+            data = self.http.get_bytes(page.thumb_url)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            page.thumb_local = str(target)
+        except Exception:  # noqa: BLE001 - 缩略图是装饰性的，失败不能影响整期
+            page.thumb_local = None
 
     def _fill_detail(self, page: Page) -> None:
         """版面列表只给目录，其余版的 PDF 直链要抓它自己的页面。"""

@@ -45,6 +45,7 @@ class Page(CamelModel):
     pdf_url: str | None = None
     original_name: str | None = None
     thumb_url: str | None = None
+    thumb_local: str | None = None
     articles: list[ArticleRef] = Field(default_factory=list)
 
 

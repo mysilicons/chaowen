@@ -26,6 +26,7 @@ class PageInfo {
     required this.url,
     this.pdfUrl,
     this.thumbUrl,
+    this.thumbLocal,
     this.articles = const [],
   });
 
@@ -34,6 +35,7 @@ class PageInfo {
   final String url;
   final String? pdfUrl;
   final String? thumbUrl;
+  final String? thumbLocal;
   final List<ArticleRef> articles;
 
   factory PageInfo.fromJson(Map<String, dynamic> json) => PageInfo(
@@ -42,6 +44,7 @@ class PageInfo {
     url: _asString(json['url']),
     pdfUrl: _asStringOrNull(json['pdfUrl']),
     thumbUrl: _asStringOrNull(json['thumbUrl']),
+    thumbLocal: _asStringOrNull(json['thumbLocal']),
     articles: (json['articles'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(ArticleRef.fromJson)

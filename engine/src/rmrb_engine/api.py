@@ -103,6 +103,8 @@ class Engine:
             page.title = page.title or record["title"]
         # 把这次解析到的版面写进库，供下次直接命中
         for page in issue.pages:
+            thumb = self.service.paths.thumb_file(d, page.no)
+            page.thumb_local = str(thumb) if thumb.exists() else None
             self.repo.save_page(
                 d,
                 page.no,
@@ -126,6 +128,11 @@ class Engine:
                 url=f"{base}node_{row['page_no']:02d}.html",
                 pdf_url=row["pdf_url"],
                 thumb_url=row["thumb_url"],
+                thumb_local=(
+                    str(self.service.paths.thumb_file(d, row["page_no"]))
+                    if self.service.paths.thumb_file(d, row["page_no"]).exists()
+                    else None
+                ),
             )
             for row in rows
         ]
@@ -295,10 +302,12 @@ class Engine:
             pdf_url=page.pdf_url,
             thumb_url=page.thumb_url,
         )
+        local = self.service.paths.thumb_file(d, report)
         return {
             "no": page.no,
             "title": page.title,
             "thumbUrl": page.thumb_url,
+            "thumbLocal": str(local) if local.exists() else None,
             "pdfUrl": page.pdf_url,
             "articles": [a.model_dump(by_alias=True) for a in page.articles],
         }
