@@ -36,6 +36,13 @@ def default_library() -> Path:
     return Path.home() / "Documents" / "人民日报"
 
 
+def default_cache() -> Path:
+    env = os.environ.get("RMRB_CACHE")
+    if env:
+        return Path(env)
+    return Path(user_cache_dir("rmrb-reader"))
+
+
 def build_engine(library: Path, cache: Path) -> Engine:
     db = Database(cache / "state.db")
     repo = Repo(db)
@@ -124,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     library = Path(args.library) if args.library else default_library()
-    cache = Path(args.cache) if args.cache else Path(user_cache_dir("rmrb-reader"))
+    cache = Path(args.cache) if args.cache else default_cache()
 
     if args.serve:
         engine = build_engine(library, cache)

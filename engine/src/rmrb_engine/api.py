@@ -48,6 +48,7 @@ class Engine:
             "hello": self.hello,
             "issue.parse": self.issue_parse,
             "issue.status": self.issue_status,
+            "library.month": self.library_month,
             "download.start": self.download_start,
         }
 
@@ -63,7 +64,17 @@ class Engine:
         }
 
     def issue_parse(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
-        issue = self.service.fetch_issue(parse_date(params))
+        d = parse_date(params)
+        issue = self.service.fetch_issue(d)
+        # 版面列表只给当前页的图与直链；其余版用库里已解析过的结果补齐，
+        # 避免为了 20 张缩略图再打 20 个请求（低速约束下的关键优化）。
+        for page in issue.pages:
+            record = self.repo.get_page(d, page.no)
+            if not record:
+                continue
+            page.thumb_url = page.thumb_url or record["thumb_url"]
+            page.pdf_url = page.pdf_url or record["pdf_url"]
+            page.title = page.title or record["title"]
         return issue.dump()
 
     def issue_status(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
@@ -79,6 +90,24 @@ class Engine:
             "bytes": record["bytes"],
             "singlesDeleted": bool(record["singles_deleted"]),
         }
+
+    def library_month(self, params: dict[str, Any], ctx: Any) -> list[dict[str, Any]]:
+        year = params.get("year")
+        month = params.get("month")
+        if not isinstance(year, int) or not isinstance(month, int):
+            raise EngineError(ErrorCode.BAD_REQUEST, "year/month 必须是整数")
+        if not 1 <= month <= 12:
+            raise EngineError(ErrorCode.BAD_REQUEST, f"月份非法：{month}")
+
+        return [
+            {
+                "date": row["date"],
+                "status": row["status"],
+                "bytes": row["bytes"],
+                "pageCount": row["page_count"],
+            }
+            for row in self.repo.list_month(year, month)
+        ]
 
     def download_start(self, params: dict[str, Any], ctx: Any) -> None:
         d = parse_date(params)
