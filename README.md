@@ -8,6 +8,11 @@
 
 —— 完全本地运行，不需要注册账号，不联网同步任何东西。
 
+<p align="center">
+  <img src="images/main_page.png" width="900" alt="书架" />
+</p>
+
+
 ## 它能做什么
 
 **书架**
@@ -18,6 +23,18 @@
 - **文字模式**：纯文字排版，可调字号，一篇文章一屏，翻起来像看电子书
 
 两种模式共用一个阅读位置，看到第二版切过去还是第二版。
+
+<table>
+  <tr>
+    <td width="50%"><img src="images/pdf_page.png" alt="PDF 模式" /></td>
+    <td width="50%"><img src="images/read_page.png" alt="文字模式" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>PDF 模式：原版版面，广告图表都在</sub></td>
+    <td align="center"><sub>文字模式：可调字号，一篇一屏</sub></td>
+  </tr>
+</table>
+
 
 **下载与存档**
 - 单独下载某一天，或按日期区间批量下载
