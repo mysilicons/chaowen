@@ -39,7 +39,7 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
                   child: MonthCalendar())
               : const SizedBox(width: double.infinity),
         ),
-        _weekStrip(date, statuses),
+        if (!_calendarOpen) _weekStrip(date, statuses),
         const SizedBox(height: 4),
         const Divider(height: 1, color: AppColors.border),
         Padding(
