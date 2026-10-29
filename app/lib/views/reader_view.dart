@@ -262,7 +262,9 @@ class _PageStrip extends StatelessWidget {
     if (pages.isEmpty) return const SizedBox(width: 72);
     return SizedBox(
       width: 72,
-      child: ListView.builder(
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: pages.length,
         itemBuilder: (context, index) {
@@ -303,8 +305,9 @@ class _PageStrip extends StatelessWidget {
                 ],
               ),
             ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -557,7 +560,7 @@ class _ArticleNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 52,
+      height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 18),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.border)),
@@ -570,27 +573,16 @@ class _ArticleNav extends StatelessWidget {
             label: const Text('上一篇'),
           ),
           const Spacer(),
-          PopupMenuButton<int>(
-            initialValue: index,
-            onSelected: onSelect,
-            tooltip: '本版文章',
-            itemBuilder: (context) => [
-              for (var i = 0; i < titles.length; i++)
-                PopupMenuItem(
-                  value: i,
-                  child: SizedBox(
-                    width: 420,
-                    child: Text(
-                      '${i + 1}. ${titles[i]}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ),
-            ],
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          InkWell(
+            onTap: () => _pick(context),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F3EC),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.border),
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -598,6 +590,7 @@ class _ArticleNav extends StatelessWidget {
                     '第 ${index + 1} / $total 篇',
                     style: const TextStyle(fontSize: 12, color: AppColors.text2),
                   ),
+                  const SizedBox(width: 4),
                   const Icon(Icons.expand_more, size: 16, color: AppColors.text2),
                 ],
               ),
@@ -613,6 +606,111 @@ class _ArticleNav extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _pick(BuildContext context) async {
+    final picked = await showDialog<int>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.28),
+      builder: (dialogContext) => Dialog(
+        backgroundColor: AppColors.paper,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 18, 12, 12),
+                child: Row(
+                  children: [
+                    const Text(
+                      '本版文章',
+                      style: TextStyle(
+                        fontFamily: AppFonts.serif,
+                        fontFamilyFallback: AppFonts.fallback,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '共 $total 篇',
+                      style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close, size: 18),
+                      color: AppColors.text2,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.border),
+              Flexible(
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  itemCount: titles.length,
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, color: AppColors.border),
+                  itemBuilder: (context, i) {
+                    final active = i == index;
+                    return InkWell(
+                      onTap: () => Navigator.of(dialogContext).pop(i),
+                      child: Container(
+                        color: active
+                            ? AppColors.brand.withValues(alpha: 0.06)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.fromLTRB(22, 15, 18, 15),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 26,
+                              child: Text(
+                                '${i + 1}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                                  color: active ? AppColors.brand : AppColors.text2,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                titles[i],
+                                style: TextStyle(
+                                  fontFamily: AppFonts.serif,
+                                  fontFamilyFallback: AppFonts.fallback,
+                                  fontSize: 14,
+                                  height: 1.5,
+                                  color: AppColors.text,
+                                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            if (active)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Icon(Icons.check, size: 15, color: AppColors.brand),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) onSelect(picked);
   }
 }
 

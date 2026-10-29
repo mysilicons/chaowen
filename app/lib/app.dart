@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/engine_client.dart';
@@ -17,7 +18,7 @@ class RmrbApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '人民日报 阅报器',
+      title: '朝闻',
       debugShowCheckedModeBanner: false,
       theme: buildLightTheme(),
       home: BootstrapGate(engine: engine),
@@ -144,7 +145,7 @@ class _Splash extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              '阅报器',
+              '朝闻',
               style: TextStyle(
                 fontFamily: AppFonts.serif,
                   fontFamilyFallback: AppFonts.fallback,
@@ -168,6 +169,7 @@ class HomeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(shellIndexProvider);
+    final collapsed = ref.watch(sidebarCollapsedProvider);
     return Scaffold(
       backgroundColor: AppColors.paper,
       body: Row(
@@ -175,7 +177,9 @@ class HomeShell extends ConsumerWidget {
         children: [
           _Sidebar(
             index: index,
+            collapsed: collapsed,
             onSelect: (value) => ref.read(shellIndexProvider.notifier).select(value),
+            onToggle: () => ref.read(sidebarCollapsedProvider.notifier).toggle(),
           ),
           const VerticalDivider(width: 1, color: AppColors.border),
           Expanded(
@@ -191,70 +195,94 @@ class HomeShell extends ConsumerWidget {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.index, required this.onSelect});
+  const _Sidebar({
+    required this.index,
+    required this.collapsed,
+    required this.onSelect,
+    required this.onToggle,
+  });
 
   final int index;
+  final bool collapsed;
   final ValueChanged<int> onSelect;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 214,
+      width: collapsed ? 68 : 214,
       color: AppColors.surface,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(22, 26, 22, 22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: EdgeInsets.fromLTRB(collapsed ? 8 : 22, 16, collapsed ? 8 : 14, 10),
+            child: Row(
               children: [
-                Text(
-                  '人民日报',
-                  style: TextStyle(
-                    fontFamily: AppFonts.serif,
-                  fontFamilyFallback: AppFonts.fallback,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.brand,
-                    letterSpacing: 2,
+                if (!collapsed)
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '人民日报',
+                          style: TextStyle(
+                            fontFamily: AppFonts.serif,
+                            fontFamilyFallback: AppFonts.fallback,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brand,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          '朝 闻',
+                          style: TextStyle(
+                            fontFamily: AppFonts.serif,
+                            fontFamilyFallback: AppFonts.fallback,
+                            fontSize: 11,
+                            color: AppColors.text2,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  '阅 报 器',
-                  style: TextStyle(
-                    fontFamily: AppFonts.serif,
-                  fontFamilyFallback: AppFonts.fallback,
-                    fontSize: 11,
-                    color: AppColors.text2,
-                    letterSpacing: 2,
-                  ),
+                IconButton(
+                  onPressed: onToggle,
+                  icon: Icon(collapsed ? Icons.chevron_right : Icons.chevron_left, size: 18),
+                  color: AppColors.text2,
+                  tooltip: collapsed ? '展开侧栏' : '收起侧栏',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
               ],
             ),
           ),
           _NavItem(
             icon: Icons.menu_book_outlined,
-            label: '书架',
+            label: collapsed ? '' : '书架',
             selected: index == 0,
             onTap: () => onSelect(0),
           ),
           _NavItem(
             icon: Icons.download_outlined,
-            label: '下载中心',
+            label: collapsed ? '' : '下载中心',
             selected: index == 1,
             onTap: () => onSelect(1),
           ),
           const Spacer(),
-          _AboutButton(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(22, 8, 22, 20),
-            child: Text(
-              '个人存档 · 低速访问\n仅限学习研究使用',
-              style: TextStyle(fontSize: 11, height: 1.6, color: AppColors.text2),
+          _AboutButton(collapsed: collapsed),
+          if (!collapsed)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(22, 8, 22, 20),
+              child: Text(
+                '个人存档 · 低速访问\n仅限学习研究使用',
+                style: TextStyle(fontSize: 11, height: 1.6, color: AppColors.text2),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -306,15 +334,22 @@ class _NavItem extends StatelessWidget {
 
 
 class _AboutButton extends ConsumerWidget {
+  const _AboutButton({required this.collapsed});
+
+  final bool collapsed;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: TextButton.icon(
         onPressed: () => _show(context, ref),
-        icon: const Icon(Icons.info_outline, size: 15, color: AppColors.text2),
-        label: const Text('关于', style: TextStyle(fontSize: 12, color: AppColors.text2)),
-        style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+        icon: const Icon(Icons.settings_outlined, size: 15, color: AppColors.text2),
+        label: Text(
+          collapsed ? '' : '设置',
+          style: const TextStyle(fontSize: 12, color: AppColors.text2),
+        ),
+        style: TextButton.styleFrom(alignment: Alignment.centerLeft, padding: EdgeInsets.zero),
       ),
     );
   }
@@ -334,16 +369,41 @@ class _AboutButton extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.paper,
-        title: const Text('关于', style: TextStyle(fontFamily: AppFonts.serif)),
+        title: const Text(
+          '设置',
+          style: TextStyle(
+            fontFamily: AppFonts.serif,
+            fontFamilyFallback: AppFonts.fallback,
+            fontSize: 18,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('人民日报 阅报器', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text('朝闻 · 人民日报阅报器', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             _row('引擎', '${hello['engine'] ?? '未连接'} (Python ${hello['python'] ?? '-'})'),
             _row('协议', 'v${hello['protocol'] ?? '-'}'),
-            _row('下载目录', hello['library'] as String? ?? '-'),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(
+                  width: 64,
+                  child: Text('下载目录', style: TextStyle(fontSize: 12, color: AppColors.text2)),
+                ),
+                Expanded(
+                  child: SelectableText(
+                    hello['library'] as String? ?? '-',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _pickDir(context, ref, hello),
+                  child: const Text('更改…', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
             _row('缓存目录', hello['cache'] as String? ?? '-'),
             const SizedBox(height: 12),
             const Text(
@@ -357,6 +417,31 @@ class _AboutButton extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _pickDir(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> hello,
+  ) async {
+    final current = hello['library'] as String?;
+    final picked = await getDirectoryPath(
+      initialDirectory: current,
+      confirmButtonText: '用这个目录',
+    );
+    if (picked == null || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(engineProvider).call('settings.set', {'downloadDir': picked});
+      ref.invalidate(helloProvider);
+      ref.invalidate(issueProvider);
+      ref.invalidate(monthStatusProvider);
+      messenger.showSnackBar(SnackBar(content: Text('下载目录已切换：$picked')));
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('切换失败：$error')));
+    }
   }
 
   Widget _row(String label, String value) => Padding(

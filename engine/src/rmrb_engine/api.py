@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import os
 import platform
 import subprocess
 import sys
@@ -15,8 +16,10 @@ from typing import Any
 
 from . import __version__
 from .core.errors import EngineError, ErrorCode
+from .core.paths import LibraryPaths
 from .services.article_service import ArticleService
 from .services.queue import DownloadService
+from .store import settings
 from .store.repo import Repo
 
 PROTOCOL_VERSION = 1
@@ -60,6 +63,8 @@ class Engine:
             "download.start": self.download_start,
             "batch.start": self.batch_start,
             "storage.reveal": self.storage_reveal,
+            "settings.get": self.settings_get,
+            "settings.set": self.settings_set,
         }
 
     # ------------------------------------------------------------------ #
@@ -164,6 +169,37 @@ class Engine:
             cursor = cursor.fromordinal(cursor.toordinal() + 1)
 
         self._emit("job.finished", {"jobId": job_id, "ok": True, "days": days})
+
+    def settings_get(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        return {
+            "downloadDir": str(self.service.paths.library),
+            "cacheDir": str(self.service.paths.cache),
+            "speedProfile": os.environ.get("RMRB_RATE", "2"),
+        }
+
+    def settings_set(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        raw = params.get("downloadDir")
+        if not isinstance(raw, str) or not raw.strip():
+            raise EngineError(ErrorCode.BAD_REQUEST, "缺少 downloadDir")
+        target = Path(raw).expanduser()
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise EngineError(
+                ErrorCode.DISK_ERROR, "目录不可用", detail=str(exc)
+            ) from exc
+        if not target.is_dir():
+            raise EngineError(ErrorCode.BAD_REQUEST, f"不是目录：{target}")
+
+        settings.save({"download_dir": str(target)})
+        self.apply_library(target)
+        return self.settings_get(params, ctx)
+
+    def apply_library(self, path: Path) -> None:
+        """切换下载目录：只换 LibraryPaths，不迁移文件。"""
+        new_paths = LibraryPaths(library=path, cache=self.service.paths.cache)
+        self.service.paths = new_paths
+        self.articles.paths = new_paths
 
     def storage_reveal(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
         """在系统文件管理器里定位下载目录（或某个文件）。"""

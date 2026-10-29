@@ -23,6 +23,7 @@ from .core.paths import LibraryPaths
 from .ipc import RpcServer
 from .net.client import HttpClient
 from .services.queue import DownloadService
+from .store import settings
 from .store.db import Database
 from .store.repo import Repo
 
@@ -33,6 +34,9 @@ def default_library() -> Path:
     env = os.environ.get("RMRB_LIBRARY")
     if env:
         return Path(env)
+    saved = settings.download_dir()
+    if saved is not None:
+        return saved
     return Path.home() / "Documents" / "人民日报"
 
 

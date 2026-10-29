@@ -140,6 +140,17 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
       state = state.where((job) => job.status == 'running').toList(growable: false);
 }
 
+/// 左侧栏是否折叠
+final sidebarCollapsedProvider =
+    NotifierProvider<SidebarCollapsed, bool>(SidebarCollapsed.new);
+
+class SidebarCollapsed extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void toggle() => state = !state;
+}
+
 /// 主界面当前页：0 书架 / 1 下载中心 / 2 阅读器
 final shellIndexProvider = NotifierProvider<ShellIndex, int>(ShellIndex.new);
 
