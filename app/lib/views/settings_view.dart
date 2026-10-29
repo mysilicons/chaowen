@@ -59,7 +59,45 @@ class SettingsView extends ConsumerWidget {
           _Section(
             title: '阅读',
             children: [
-              _Row(label: '默认模式', value: '文字（PDF 需先下载本期）'),
+              _SwitchRow(
+                label: '打开时进入 PDF',
+                hint: '关闭则默认文字模式（PDF 需要先下载本期）',
+                value: ref.watch(readerModeProvider) == 'pdf',
+                onChanged: (value) => ref
+                    .read(readerModeProvider.notifier)
+                    .select(value ? 'pdf' : 'text'),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 76,
+                    child: Text('正文字号',
+                        style: TextStyle(fontSize: 12, color: AppColors.text2)),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: ref.watch(readerScaleProvider),
+                      min: 0.85,
+                      max: 1.5,
+                      divisions: 13,
+                      label: '${(ref.watch(readerScaleProvider) * 100).round()}%',
+                      activeColor: AppColors.brand,
+                      onChanged: (value) => ref
+                          .read(readerScaleProvider.notifier)
+                          .step(value - ref.read(readerScaleProvider)),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '${(ref.watch(readerScaleProvider) * 100).round()}%',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 6),
               _Row(label: '阅读速度', value: '1 并发 · 2 请求/秒（低速访问）'),
             ],
@@ -115,6 +153,41 @@ class SettingsView extends ConsumerWidget {
     } catch (_) {
       // 目录不存在时静默失败，界面上路径仍然可见
     }
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.label,
+    required this.hint,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String hint;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 76,
+          child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+        ),
+        Expanded(
+          child: Text(hint, style: const TextStyle(fontSize: 11, color: AppColors.text2)),
+        ),
+        Switch(
+          value: value,
+          onChanged: onChanged,
+          activeThumbColor: Colors.white,
+          activeTrackColor: AppColors.brand,
+        ),
+      ],
+    );
   }
 }
 

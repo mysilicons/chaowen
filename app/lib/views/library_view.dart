@@ -25,6 +25,10 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
     final statuses = ref.watch(monthStatusProvider(isoMonth(date))).value ??
         const <String, DayStatus>{};
     final archived = statuses[iso]?.state == DayState.archived;
+    final running = ref
+        .watch(queueProvider)
+        .where((job) => job.date == iso && job.status == 'running')
+        .firstOrNull;
 
     return Stack(children: [
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -67,13 +71,38 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
         Positioned(
           right: 26,
           bottom: 22,
-          child: FloatingActionButton.extended(
-            onPressed: () => _download(iso),
-            backgroundColor: AppColors.brand,
-            foregroundColor: Colors.white,
-            elevation: 2,
-            icon: const Icon(Icons.download_outlined, size: 18),
-            label: const Text('下载本期', style: TextStyle(fontSize: 13)),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    value: running?.progress,
+                    strokeWidth: 2.5,
+                    backgroundColor: running == null
+                        ? Colors.transparent
+                        : AppColors.brand.withValues(alpha: 0.15),
+                    valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                  ),
+                ),
+                FloatingActionButton(
+                  onPressed: running == null ? () => _download(iso) : null,
+                  backgroundColor: AppColors.brand,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  mini: true,
+                  shape: const CircleBorder(),
+                  child: Icon(
+                    running == null ? Icons.download_outlined : Icons.downloading,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
     ]);
@@ -150,8 +179,8 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
       onTap: future ? null : () => ref.read(selectedDateProvider.notifier).select(day),
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        height: 58,
-        margin: const EdgeInsets.symmetric(horizontal: 3),
+        height: 44,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.brand : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -161,26 +190,26 @@ class _LibraryViewState extends ConsumerState<LibraryView> {
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(_wd[day.weekday - 1],
               style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 9,
                   color: isSelected
                       ? Colors.white70
                       : future
                           ? AppColors.border
                           : AppColors.text2)),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text('${day.day}',
               style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                   color: isSelected
                       ? Colors.white
                       : future
                           ? AppColors.border
                           : AppColors.text)),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Container(
-            width: 4,
-            height: 4,
+            width: 3,
+            height: 3,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: status?.state == DayState.archived
