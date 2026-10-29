@@ -44,7 +44,6 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
           pageNo: pageNo,
           mode: mode,
           scale: scale,
-          canReadPdf: mergedPath != null,
           onMode: (value) => ref.read(readerModeProvider.notifier).select(value),
           onBack: () => ref.read(shellIndexProvider.notifier).select(0),
         ),
@@ -68,6 +67,7 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
                 child: mode == 'pdf'
                     ? _PdfPane(path: mergedPath, pageNo: pageNo, controller: _pdfController)
                     : _TextPane(
+                        key: ValueKey('text-${target.date}-$pageNo'),
                         date: target.date,
                         pageNo: pageNo,
                         page: page,
@@ -84,14 +84,13 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
   }
 }
 
-class _ReaderBar extends StatelessWidget {
+class _ReaderBar extends ConsumerWidget {
   const _ReaderBar({
     required this.date,
     required this.title,
     required this.pageNo,
     required this.mode,
     required this.scale,
-    required this.canReadPdf,
     required this.onMode,
     required this.onBack,
   });
@@ -101,12 +100,11 @@ class _ReaderBar extends StatelessWidget {
   final int pageNo;
   final String mode;
   final double scale;
-  final bool canReadPdf;
   final ValueChanged<String> onMode;
   final VoidCallback onBack;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       height: 58,
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -136,21 +134,23 @@ class _ReaderBar extends StatelessWidget {
           _ModeSwitch(mode: mode, onChanged: onMode),
           const SizedBox(width: 16),
           if (mode == 'text') ...[
-            _ScaleButton(label: 'A-', onTap: () => _step(context, -0.1)),
-            _ScaleButton(label: 'A+', onTap: () => _step(context, 0.1)),
+            _ScaleButton(
+              label: 'A-',
+              onTap: () => ref.read(readerScaleProvider.notifier).step(-0.1),
+            ),
+            _ScaleButton(
+              label: 'A+',
+              onTap: () => ref.read(readerScaleProvider.notifier).step(0.1),
+            ),
             const SizedBox(width: 8),
-            Text('${(scale * 100).round()}%', style: const TextStyle(fontSize: 11, color: AppColors.text2)),
+            Text(
+              '${(scale * 100).round()}%',
+              style: const TextStyle(fontSize: 11, color: AppColors.text2),
+            ),
           ],
         ],
       ),
     );
-  }
-
-  void _step(BuildContext context, double delta) {
-    // 通过 ProviderScope 读取，避免把 ref 传进来
-    ProviderScope.containerOf(context, listen: false)
-        .read(readerScaleProvider.notifier)
-        .step(delta);
   }
 }
 
@@ -207,7 +207,9 @@ class _ModeSwitch extends StatelessWidget {
           color: selected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(5),
           boxShadow: selected
-              ? const [BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1))]
+              ? const [
+                  BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
+                ]
               : null,
         ),
         child: Text(
@@ -232,9 +234,7 @@ class _PageStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (pages.isEmpty) {
-      return const SizedBox(width: 72);
-    }
+    if (pages.isEmpty) return const SizedBox(width: 72);
     return SizedBox(
       width: 72,
       child: ListView.builder(
@@ -304,7 +304,10 @@ class _PdfPane extends StatelessWidget {
             SizedBox(height: 10),
             Text('本期尚未下载，无法按 PDF 阅读', style: TextStyle(color: AppColors.text2)),
             SizedBox(height: 4),
-            Text('可以先看「文字」模式，或回书架下载本期', style: TextStyle(fontSize: 12, color: AppColors.text2)),
+            Text(
+              '可以先看「文字」模式，或回书架下载本期',
+              style: TextStyle(fontSize: 12, color: AppColors.text2),
+            ),
           ],
         ),
       );
@@ -315,16 +318,15 @@ class _PdfPane extends StatelessWidget {
       key: ValueKey(file),
       controller: controller,
       initialPageNumber: pageNo,
-      params: const PdfViewerParams(
-        backgroundColor: Color(0xFFF1EEE7),
-        margin: 12,
-      ),
+      params: const PdfViewerParams(backgroundColor: Color(0xFFF1EEE7), margin: 12),
     );
   }
 }
 
-class _TextPane extends ConsumerWidget {
+/// 文字阅读：一次只显示一篇文章，底栏上一篇/下一篇，标题栏可下拉跳转。
+class _TextPane extends ConsumerStatefulWidget {
   const _TextPane({
+    super.key,
     required this.date,
     required this.pageNo,
     required this.page,
@@ -339,8 +341,17 @@ class _TextPane extends ConsumerWidget {
   final VoidCallback onSwitchToPdf;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(articlePageProvider((date: date, no: pageNo)));
+  ConsumerState<_TextPane> createState() => _TextPaneState();
+}
+
+class _TextPaneState extends ConsumerState<_TextPane> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(
+      articlePageProvider((date: widget.date, no: widget.pageNo)),
+    );
 
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -348,16 +359,17 @@ class _TextPane extends ConsumerWidget {
         icon: Icons.cloud_off_outlined,
         text: '正文抓取失败\n$error',
         action: TextButton(
-          onPressed: () =>
-              ref.invalidate(articlePageProvider((date: date, no: pageNo))),
+          onPressed: () => ref.invalidate(
+            articlePageProvider((date: widget.date, no: widget.pageNo)),
+          ),
           child: const Text('重试'),
         ),
       ),
-      data: (data) => _body(context, ref, data),
+      data: (data) => _buildContent(data),
     );
   }
 
-  Widget _body(BuildContext context, WidgetRef ref, ArticlePage data) {
+  Widget _buildContent(ArticlePage data) {
     if (data.kind == PageKind.empty || data.kind == PageKind.failed) {
       return _Message(
         icon: Icons.article_outlined,
@@ -365,10 +377,11 @@ class _TextPane extends ConsumerWidget {
         action: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextButton(onPressed: onSwitchToPdf, child: const Text('切换 PDF 阅读')),
+            TextButton(onPressed: widget.onSwitchToPdf, child: const Text('切换 PDF 阅读')),
             TextButton(
-              onPressed: () =>
-                  ref.invalidate(articlePageProvider((date: date, no: pageNo))),
+              onPressed: () => ref.invalidate(
+                articlePageProvider((date: widget.date, no: widget.pageNo)),
+              ),
               child: const Text('重试'),
             ),
           ],
@@ -376,11 +389,20 @@ class _TextPane extends ConsumerWidget {
       );
     }
 
+    final total = data.articles.length;
+    final index = _index.clamp(0, total - 1);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (data.kind == PageKind.imageOnly) _imageOnlyBanner(),
-        Expanded(child: _flow(context, data)),
+        Expanded(child: _articleBody(data.articles[index], data)),
+        _ArticleNav(
+          index: index,
+          total: total,
+          titles: data.articles.map((a) => a.title).toList(growable: false),
+          onSelect: (value) => setState(() => _index = value),
+        ),
       ],
     );
   }
@@ -399,106 +421,75 @@ class _TextPane extends ConsumerWidget {
               style: TextStyle(fontSize: 12, color: AppColors.text2),
             ),
           ),
-          TextButton(onPressed: onSwitchToPdf, child: const Text('看 PDF', style: TextStyle(fontSize: 12))),
+          TextButton(
+            onPressed: widget.onSwitchToPdf,
+            child: const Text('看 PDF', style: TextStyle(fontSize: 12)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _flow(BuildContext context, ArticlePage data) {
-    final thumb = page?.thumbUrl;
-    final children = <Widget>[];
-
-    if (data.kind == PageKind.imageOnly && thumb != null) {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Image.network(
-              thumb,
-              fit: BoxFit.fitWidth,
-              errorBuilder: (context, error, stack) => const SizedBox.shrink(),
-            ),
-          ),
-        ),
-      );
-    }
-
-    for (var index = 0; index < data.articles.length; index++) {
-      final article = data.articles[index];
-      children.add(
-        Text(
-          article.title,
-          style: TextStyle(
-            fontFamily: AppFonts.serif,
-            fontSize: 21 * scale,
-            fontWeight: FontWeight.w700,
-            height: 1.5,
-            color: AppColors.text,
-          ),
-        ),
-      );
-      if (article.author != null && article.author!.isNotEmpty) {
-        children.add(const SizedBox(height: 8));
-        children.add(
-          Text(
-            article.author!,
-            style: TextStyle(fontSize: 12 * scale, color: AppColors.text2),
-          ),
-        );
-      }
-      children.add(const SizedBox(height: 18));
-
-      for (final block in article.blocks) {
-        if (block.isImage) {
-          children.add(_image(block, scale));
-        } else if ((block.text ?? '').isNotEmpty) {
-          children.add(
-            Padding(
-              padding: EdgeInsets.only(bottom: 14 * scale),
-              child: Text(
-                '\u3000\u3000${block.text}',
-                style: TextStyle(
-                  fontFamily: AppFonts.serif,
-                  fontSize: 17 * scale,
-                  height: 1.9,
-                  color: AppColors.text,
-                ),
-              ),
-            ),
-          );
-        }
-      }
-
-      if (index != data.articles.length - 1) {
-        children.add(
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 26),
-            child: Row(
-              children: [
-                Expanded(child: Divider(color: AppColors.border)),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Text('◆', style: TextStyle(fontSize: 8, color: AppColors.border)),
-                ),
-                Expanded(child: Divider(color: AppColors.border)),
-              ],
-            ),
-          ),
-        );
-      }
-    }
+  Widget _articleBody(Article article, ArticlePage data) {
+    final scale = widget.scale;
+    final thumb = widget.page?.thumbUrl;
 
     return SelectionArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(36, 26, 36, 40),
+        padding: const EdgeInsets.fromLTRB(28, 26, 28, 32),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: const BoxConstraints(maxWidth: 980),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
+              children: [
+                if (data.kind == PageKind.imageOnly && thumb != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 22),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(
+                        thumb,
+                        fit: BoxFit.fitWidth,
+                        errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                Text(
+                  article.title,
+                  style: TextStyle(
+                    fontFamily: AppFonts.serif,
+                    fontSize: 22 * scale,
+                    fontWeight: FontWeight.w700,
+                    height: 1.5,
+                    color: AppColors.text,
+                  ),
+                ),
+                if (article.author != null && article.author!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    article.author!,
+                    style: TextStyle(fontSize: 12 * scale, color: AppColors.text2),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                for (final block in article.blocks)
+                  if (block.isImage)
+                    _image(block, scale)
+                  else if ((block.text ?? '').isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 14 * scale),
+                      child: Text(
+                        '\u3000\u3000${block.text}',
+                        style: TextStyle(
+                          fontFamily: AppFonts.serif,
+                          fontSize: 17 * scale,
+                          height: 1.9,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+              ],
             ),
           ),
         ),
@@ -508,9 +499,7 @@ class _TextPane extends ConsumerWidget {
 
   Widget _image(Block block, double scale) {
     final path = block.local;
-    if (path == null || !File(path).existsSync()) {
-      return const SizedBox.shrink();
-    }
+    if (path == null || !File(path).existsSync()) return const SizedBox.shrink();
     return Padding(
       padding: EdgeInsets.only(bottom: 16 * scale),
       child: ClipRRect(
@@ -520,6 +509,81 @@ class _TextPane extends ConsumerWidget {
           fit: BoxFit.fitWidth,
           errorBuilder: (context, error, stack) => const SizedBox.shrink(),
         ),
+      ),
+    );
+  }
+}
+
+class _ArticleNav extends StatelessWidget {
+  const _ArticleNav({
+    required this.index,
+    required this.total,
+    required this.titles,
+    required this.onSelect,
+  });
+
+  final int index;
+  final int total;
+  final List<String> titles;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          TextButton.icon(
+            onPressed: index > 0 ? () => onSelect(index - 1) : null,
+            icon: const Icon(Icons.chevron_left, size: 18),
+            label: const Text('上一篇'),
+          ),
+          const Spacer(),
+          PopupMenuButton<int>(
+            initialValue: index,
+            onSelected: onSelect,
+            tooltip: '本版文章',
+            itemBuilder: (context) => [
+              for (var i = 0; i < titles.length; i++)
+                PopupMenuItem(
+                  value: i,
+                  child: SizedBox(
+                    width: 420,
+                    child: Text(
+                      '${i + 1}. ${titles[i]}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '第 ${index + 1} / $total 篇',
+                    style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                  ),
+                  const Icon(Icons.expand_more, size: 16, color: AppColors.text2),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: index < total - 1 ? () => onSelect(index + 1) : null,
+            icon: const Icon(Icons.chevron_right, size: 18),
+            iconAlignment: IconAlignment.end,
+            label: const Text('下一篇'),
+          ),
+        ],
       ),
     );
   }

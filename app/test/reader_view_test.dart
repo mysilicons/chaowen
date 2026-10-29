@@ -106,6 +106,20 @@ void main() {
     expect(find.text('第01版 · 要闻'), findsNothing);
   });
 
+  testWidgets('一次只显示一篇，可切换下一篇', (tester) async {
+    await pumpReader(tester, FakeEngine());
+
+    expect(find.text('第 1 / 2 篇'), findsOneWidget);
+    expect(find.text('做伟大长征精神的传承者弘扬者践行者'), findsNothing);
+
+    await tester.tap(find.text('下一篇'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('第 2 / 2 篇'), findsOneWidget);
+    expect(find.text('做伟大长征精神的传承者弘扬者践行者'), findsOneWidget);
+    expect(find.text('更加清醒坚定地推进反腐败斗争'), findsNothing);
+  });
+
   testWidgets('纯图版显示降级提示', (tester) async {
     await pumpReader(tester, FakeEngine(kind: 'image_only'));
 

@@ -35,15 +35,27 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            '下载中心',
-            style: TextStyle(
-              fontFamily: AppFonts.serif,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text(
+                '下载中心',
+                style: TextStyle(
+                  fontFamily: AppFonts.serif,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: _LibraryPath()),
+              TextButton.icon(
+                onPressed: () => _reveal(),
+                icon: const Icon(Icons.folder_open, size: 16),
+                label: const Text('打开下载目录', style: TextStyle(fontSize: 12)),
+              ),
+            ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           _Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,6 +208,21 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
     );
   }
 
+  Future<void> _reveal() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final hello = await ref.read(helloProvider.future);
+    final library = hello['library'] as String?;
+    if (library == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('引擎未就绪')));
+      return;
+    }
+    try {
+      await ref.read(engineProvider).call('storage.reveal', {'path': library});
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('打开失败：$error')));
+    }
+  }
+
   Future<void> _startSingle(BuildContext context, String date) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -298,6 +325,21 @@ class _Card extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: child,
+    );
+  }
+}
+
+
+class _LibraryPath extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hello = ref.watch(helloProvider);
+    final path = hello.value?['library'] as String?;
+    return Text(
+      path == null ? '' : '下载到：$path',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 11, color: AppColors.text2),
     );
   }
 }

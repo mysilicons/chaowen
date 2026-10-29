@@ -7,7 +7,10 @@
 from __future__ import annotations
 
 import platform
+import subprocess
+import sys
 from datetime import date as Date
+from pathlib import Path
 from typing import Any
 
 from . import __version__
@@ -55,6 +58,7 @@ class Engine:
             "article.page": self.article_page,
             "download.start": self.download_start,
             "batch.start": self.batch_start,
+            "storage.reveal": self.storage_reveal,
         }
 
     # ------------------------------------------------------------------ #
@@ -159,6 +163,27 @@ class Engine:
             cursor = cursor.fromordinal(cursor.toordinal() + 1)
 
         self._emit("job.finished", {"jobId": job_id, "ok": True, "days": days})
+
+    def storage_reveal(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        """在系统文件管理器里定位下载目录（或某个文件）。"""
+        raw = params.get("path")
+        if not isinstance(raw, str) or not raw.strip():
+            raise EngineError(ErrorCode.BAD_REQUEST, "缺少 path")
+        target = Path(raw)
+        if not target.exists():
+            raise EngineError(ErrorCode.BAD_REQUEST, f"路径不存在：{raw}")
+
+        if sys.platform == "win32":
+            if target.is_dir():
+                subprocess.Popen(["explorer", str(target)])  # noqa: S603
+            else:
+                subprocess.Popen(["explorer", "/select,", str(target)])  # noqa: S603
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R" if target.is_file() else "", str(target)])  # noqa: S603
+        else:
+            subprocess.Popen(["xdg-open", str(target if target.is_dir() else target.parent)])  # noqa: S603
+
+        return {"ok": True, "path": str(target)}
 
     def article_page(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
         d = parse_date(params)

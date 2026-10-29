@@ -60,7 +60,7 @@ class DownloadJob {
   DownloadJob({required this.jobId, required this.date});
 
   final String jobId;
-  final String date;
+  String date;
   int done = 0;
   int total = 0;
   int currentPage = 0;
@@ -97,6 +97,8 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
       case 'batch.progress':
         _ensure(jobId, date);
         _update(jobId, (job) {
+          // 批量任务按天推进，标题要跟着当前这一天走
+          job.date = date;
           job.done = (event.data['index'] as num?)?.toInt() ?? job.done;
           job.total = (event.data['total'] as num?)?.toInt() ?? job.total;
         });
@@ -189,6 +191,14 @@ class ReaderScale extends Notifier<double> {
     state = double.parse(next.toStringAsFixed(2));
   }
 }
+
+/// 引擎信息（版本、下载目录、缓存目录）
+final helloProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final raw = await ref
+      .watch(engineProvider)
+      .call('hello', {'protocol': 1, 'client': 'rmrb-reader/0.1.0'});
+  return raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
+});
 
 /// 某期是否已合并（阅读器需要 mergedPath）
 final issueStatusProvider =
