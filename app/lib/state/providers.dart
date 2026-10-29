@@ -84,13 +84,21 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
   void _apply(EngineEvent event) {
     final jobId = event.data['jobId'] as String?;
     if (jobId == null) return;
+    final date = event.data['date'] as String? ?? '';
 
     switch (event.name) {
       case 'download.progress':
+        _ensure(jobId, date);
         _update(jobId, (job) {
           job.done = (event.data['done'] as num?)?.toInt() ?? job.done;
           job.total = (event.data['total'] as num?)?.toInt() ?? job.total;
           job.currentPage = (event.data['pageNo'] as num?)?.toInt() ?? job.currentPage;
+        });
+      case 'batch.progress':
+        _ensure(jobId, date);
+        _update(jobId, (job) {
+          job.done = (event.data['index'] as num?)?.toInt() ?? job.done;
+          job.total = (event.data['total'] as num?)?.toInt() ?? job.total;
         });
       case 'issue.archived':
         _update(jobId, (job) => job.status = 'archived');
@@ -106,6 +114,14 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
       default:
         return;
     }
+  }
+
+  DownloadJob _ensure(String jobId, String date) {
+    final index = state.indexWhere((job) => job.jobId == jobId);
+    if (index >= 0) return state[index];
+    final job = DownloadJob(jobId: jobId, date: date.isEmpty ? '批量' : date);
+    state = [...state, job];
+    return job;
   }
 
   void _update(String jobId, void Function(DownloadJob) mutate) {

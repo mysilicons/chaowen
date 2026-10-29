@@ -243,8 +243,9 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelect(1),
           ),
           const Spacer(),
+          _AboutButton(),
           const Padding(
-            padding: EdgeInsets.fromLTRB(22, 0, 22, 20),
+            padding: EdgeInsets.fromLTRB(22, 8, 22, 20),
             child: Text(
               '个人存档 · 低速访问\n仅限学习研究使用',
               style: TextStyle(fontSize: 11, height: 1.6, color: AppColors.text2),
@@ -297,4 +298,76 @@ class _NavItem extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class _AboutButton extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: TextButton.icon(
+        onPressed: () => _show(context, ref),
+        icon: const Icon(Icons.info_outline, size: 15, color: AppColors.text2),
+        label: const Text('关于', style: TextStyle(fontSize: 12, color: AppColors.text2)),
+        style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+      ),
+    );
+  }
+
+  Future<void> _show(BuildContext context, WidgetRef ref) async {
+    final engine = ref.read(engineProvider);
+    Map<String, dynamic> hello = const {};
+    try {
+      final raw = await engine.call('hello', {'protocol': 1, 'client': 'rmrb-reader/0.1.0'});
+      if (raw is Map<String, dynamic>) hello = raw;
+    } catch (_) {
+      // 引擎没响应也不阻塞"关于"对话框
+    }
+    if (!context.mounted) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.paper,
+        title: const Text('关于', style: TextStyle(fontFamily: AppFonts.serif)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('人民日报 阅报器', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            _row('引擎', '${hello['engine'] ?? '未连接'} (Python ${hello['python'] ?? '-'})'),
+            _row('协议', 'v${hello['protocol'] ?? '-'}'),
+            _row('下载目录', hello['library'] as String? ?? '-'),
+            _row('缓存目录', hello['cache'] as String? ?? '-'),
+            const SizedBox(height: 12),
+            const Text(
+              '仅供个人学习研究使用，请勿用于商业目的或对外分发。',
+              style: TextStyle(fontSize: 11, color: AppColors.text2, height: 1.6),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('关闭')),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 64,
+          child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+        ),
+        Expanded(
+          child: SelectableText(value, style: const TextStyle(fontSize: 12)),
+        ),
+      ],
+    ),
+  );
 }

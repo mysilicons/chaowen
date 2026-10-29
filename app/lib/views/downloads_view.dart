@@ -4,16 +4,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/providers.dart';
 import '../theme/tokens.dart';
 
-class DownloadsView extends ConsumerWidget {
+class DownloadsView extends ConsumerStatefulWidget {
   const DownloadsView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DownloadsView> createState() => _DownloadsViewState();
+}
+
+class _DownloadsViewState extends ConsumerState<DownloadsView> {
+  late DateTime _from;
+  late DateTime _to;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _to = DateTime(now.year, now.month, now.day);
+    _from = _to.subtract(const Duration(days: 6));
+  }
+
+  int get _days => _to.difference(_from).inDays + 1;
+
+  @override
+  Widget build(BuildContext context) {
     final jobs = ref.watch(queueProvider);
     final date = ref.watch(selectedDateProvider);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 16),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -31,7 +49,7 @@ class DownloadsView extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('单日下载', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   '${date.year}年${date.month}月${date.day}日',
                   style: const TextStyle(fontSize: 13, color: AppColors.text2),
@@ -47,7 +65,7 @@ class DownloadsView extends ConsumerWidget {
                     ),
                     const Spacer(),
                     FilledButton(
-                      onPressed: () => _start(context, ref, isoDate(date)),
+                      onPressed: () => _startSingle(context, isoDate(date)),
                       style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
                       child: const Text('开始下载'),
                     ),
@@ -56,7 +74,47 @@ class DownloadsView extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('批量下载', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _preset('近 7 天', 7),
+                    _preset('近 30 天', 30),
+                    _preset('本月', -1),
+                    _preset('本年', -2),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _dateField('从', _from, (value) => setState(() => _from = value)),
+                    const SizedBox(width: 12),
+                    _dateField('到', _to, (value) => setState(() => _to = value)),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Text(
+                        '$_days 天 · 约 ${(_days * 63)} MB · 约 ${(_days * 45 / 60).ceil()} 分钟',
+                        style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                      ),
+                    ),
+                    FilledButton(
+                      onPressed: _days > 0 ? () => _startBatch(context) : null,
+                      style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
+                      child: const Text('加入队列'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
           Row(
             children: [
               const Text('队列', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -70,27 +128,95 @@ class DownloadsView extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Expanded(
-            child: jobs.isEmpty
-                ? const Center(
-                    child: Text('暂无任务', style: TextStyle(color: AppColors.text2)),
-                  )
-                : ListView.separated(
-                    itemCount: jobs.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) => _JobTile(job: jobs[index]),
-                  ),
-          ),
+          if (jobs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: Text('暂无任务', style: TextStyle(color: AppColors.text2)),
+              ),
+            )
+          else
+            ...jobs.map(
+              (job) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _JobTile(job: job),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Future<void> _start(BuildContext context, WidgetRef ref, String date) async {
+  Widget _preset(String label, int days) {
+    return ActionChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      onPressed: () {
+        final now = DateTime.now();
+        setState(() {
+          _to = DateTime(now.year, now.month, now.day);
+          _from = switch (days) {
+            7 => _to.subtract(const Duration(days: 6)),
+            30 => _to.subtract(const Duration(days: 29)),
+            -1 => DateTime(now.year, now.month, 1),
+            _ => DateTime(now.year, 1, 1),
+          };
+        });
+      },
+      backgroundColor: const Color(0xFFF6F3EC),
+      side: const BorderSide(color: AppColors.border),
+    );
+  }
+
+  Widget _dateField(String label, DateTime value, ValueChanged<DateTime> onChanged) {
+    return InkWell(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: value,
+          firstDate: DateTime(2024, 12, 1),
+          lastDate: DateTime.now(),
+        );
+        if (picked != null) onChanged(picked);
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('$label ', style: const TextStyle(fontSize: 12, color: AppColors.text2)),
+            Text(isoDate(value), style: const TextStyle(fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startSingle(BuildContext context, String date) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(engineProvider).call('download.start', {'date': date});
       messenger.showSnackBar(const SnackBar(content: Text('任务已提交')));
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('提交失败：$error')));
+    }
+  }
+
+  Future<void> _startBatch(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final raw = await ref.read(engineProvider).call('batch.start', {
+        'from': isoDate(_from),
+        'to': isoDate(_to),
+      });
+      final jobId = raw is Map<String, dynamic> ? raw['jobId'] : null;
+      messenger.showSnackBar(
+        SnackBar(content: Text('已加入队列：$_days 天${jobId == null ? '' : '（$jobId）'}')),
+      );
     } catch (error) {
       messenger.showSnackBar(SnackBar(content: Text('提交失败：$error')));
     }
@@ -120,7 +246,8 @@ class _JobTile extends StatelessWidget {
                     ? '失败'
                     : finished
                     ? '完成'
-                    : '第 ${job.currentPage} 版 · ${job.done}/${job.total}',
+                    : '${job.currentPage > 0 ? '第 ${job.currentPage} 版 · ' : ''}'
+                          '${job.done}/${job.total}',
                 style: TextStyle(
                   fontSize: 12,
                   color: failed

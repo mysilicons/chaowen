@@ -54,6 +54,7 @@ class Engine:
             "library.month": self.library_month,
             "article.page": self.article_page,
             "download.start": self.download_start,
+            "batch.start": self.batch_start,
         }
 
     # ------------------------------------------------------------------ #
@@ -65,6 +66,8 @@ class Engine:
             "protocol": PROTOCOL_VERSION,
             "engine": __version__,
             "python": platform.python_version(),
+            "library": str(self.service.paths.library),
+            "cache": str(self.service.paths.cache),
         }
 
     def issue_parse(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
@@ -112,6 +115,50 @@ class Engine:
             }
             for row in self.repo.list_month(year, month)
         ]
+
+    def batch_start(self, params: dict[str, Any], ctx: Any) -> None:
+        start = parse_date({"date": params.get("from")})
+        end = parse_date({"date": params.get("to")})
+        if end < start:
+            raise EngineError(ErrorCode.BAD_REQUEST, "结束日期早于开始日期")
+        days = (end - start).days + 1
+        if days > 366:
+            raise EngineError(ErrorCode.BAD_REQUEST, "一次最多 366 天")
+
+        self._job_seq += 1
+        job_id = f"batch-{start:%Y%m%d}-{self._job_seq}"
+        ctx.respond(
+            {
+                "jobId": job_id,
+                "days": days,
+                "estBytes": days * 63 * 1024 * 1024,
+                "estSeconds": days * 45,
+            }
+        )
+
+        cursor = start
+        index = 0
+        while cursor <= end:
+            index += 1
+            self._emit(
+                "batch.progress",
+                {
+                    "jobId": job_id,
+                    "date": cursor.isoformat(),
+                    "index": index,
+                    "total": days,
+                },
+            )
+            try:
+                self.service.run_issue(cursor, job_id=job_id)
+            except EngineError as exc:
+                self._emit(
+                    "batch.day",
+                    {"jobId": job_id, "date": cursor.isoformat(), "error": exc.code.value},
+                )
+            cursor = cursor.fromordinal(cursor.toordinal() + 1)
+
+        self._emit("job.finished", {"jobId": job_id, "ok": True, "days": days})
 
     def article_page(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
         d = parse_date(params)

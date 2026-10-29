@@ -74,7 +74,25 @@ class EngineClient {
 
   List<String> get stderrTail => List.unmodifiable(_stderrTail);
 
+  /// 发布态：引擎随应用分发在 `<exe 目录>/engine/rmrb_engine.exe`。
+  static String? bundledEnginePath() {
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+    final candidate = p.join(exeDir, 'engine', 'rmrb_engine.exe');
+    return File(candidate).existsSync() ? candidate : null;
+  }
+
   static Future<EngineTransport> _spawn() async {
+    final bundled = bundledEnginePath();
+    if (bundled != null) {
+      final process = await Process.start(
+        bundled,
+        ['--serve'],
+        workingDirectory: File(bundled).parent.path,
+      );
+      return ProcessTransport(process);
+    }
+
+    // 开发态：仓库里用 uv 跑源码
     final engineDir = resolveEngineDir();
     final process = await Process.start(
       'uv',

@@ -9,7 +9,8 @@
 
 ## 项目状态
 
-开发中。进度以 [开发计划书](docs/人民日报阅报器-开发计划书.md) 为准：
+**v0.1.0 已可交付**：书架 / 双模式阅读 / 单日与批量下载 / 打包为免安装目录。
+进度以 [开发计划书](docs/人民日报阅报器-开发计划书.md) 为准：
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
@@ -17,7 +18,7 @@
 | P1 | 引擎核心 | ✅ 已完成（78 单测 + G1 验收） |
 | P2 | 链路打通 | ✅ 已完成（书架 + 下载中心） |
 | P3 | 双模式阅读 | ✅ 已完成（PDF + 文字） |
-| P4 | 打磨交付 | 未开始 |
+| P4 | 打磨交付 | ✅ 已完成（便携目录 94.3 MB） |
 
 ## 架构
 
@@ -54,16 +55,23 @@ _probe/     线上抓取的真实样本（测试夹具）
 
 ## 快速开始
 
+**用打包好的版本**：运行 `scripts/package.ps1`，产物在 `dist\人民日报阅报器\`，双击 `rmrb_reader.exe` 即可（不需要装 Python 或 Flutter）。
+
+**从源码跑**：
+
 ```powershell
-# 引擎
 cd engine
 uv sync
-uv run python -m rmrb_engine --version
 
-# 应用
 cd ..\app
 flutter pub get
 flutter run -d windows
+```
+
+**打包**：
+
+```powershell
+pwsh scripts/package.ps1
 ```
 
 ## 字体
