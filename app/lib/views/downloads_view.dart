@@ -14,12 +14,14 @@ class DownloadsView extends ConsumerStatefulWidget {
 class _DownloadsViewState extends ConsumerState<DownloadsView> {
   late DateTime _from;
   late DateTime _to;
+  late DateTime _single;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _to = DateTime(now.year, now.month, now.day);
+    _single = _to;
     _from = _to.subtract(const Duration(days: 6));
   }
 
@@ -28,7 +30,6 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
   @override
   Widget build(BuildContext context) {
     final jobs = ref.watch(queueProvider);
-    final date = ref.watch(selectedDateProvider);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
@@ -62,10 +63,16 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('单日下载', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                Text(
-                  '${date.year}年${date.month}月${date.day}日',
-                  style: const TextStyle(fontSize: 13, color: AppColors.text2),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _dateField('日期', _single, (value) => setState(() => _single = value)),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${_single.year}年${_single.month}月${_single.day}日',
+                      style: const TextStyle(fontSize: 12, color: AppColors.text2),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -78,7 +85,7 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
                     ),
                     const Spacer(),
                     FilledButton(
-                      onPressed: () => _startSingle(context, isoDate(date)),
+                      onPressed: () => _startSingle(context, isoDate(_single)),
                       style: FilledButton.styleFrom(backgroundColor: AppColors.brand),
                       child: const Text('开始下载'),
                     ),

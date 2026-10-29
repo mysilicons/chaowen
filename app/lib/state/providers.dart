@@ -207,6 +207,15 @@ final issueStatusProvider =
   return raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
 });
 
+/// 单版详情（缩略图 / PDF 直链）——未下载过的日期也能拿到每一版的图
+final pageDetailProvider =
+    FutureProvider.family<PageInfo, ({String date, int no})>((ref, key) async {
+  final raw = await ref
+      .watch(engineProvider)
+      .call('issue.page', {'date': key.date, 'pageNo': key.no});
+  return PageInfo.fromJson(raw is Map<String, dynamic> ? raw : const {});
+});
+
 /// 某一版的文字内容（blocks）
 final articlePageProvider =
     FutureProvider.family<ArticlePage, ({String date, int no})>((ref, key) async {

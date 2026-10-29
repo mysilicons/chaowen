@@ -8,12 +8,24 @@ import 'package:rmrb_reader/widgets/page_thumb.dart';
 
 /// 只实现 UI 需要的两个方法，不启动真实引擎。
 class FakeEngine extends EngineClient {
+  final List<String> calls = [];
+
   @override
   Future<Object?> call(
     String method, [
     Map<String, dynamic>? params,
     Duration timeout = const Duration(seconds: 30),
   ]) async {
+    calls.add(method);
+    if (method == 'issue.page') {
+      final no = (params?['pageNo'] as int?) ?? 1;
+      return {
+        'no': no,
+        'title': '要闻',
+        'thumbUrl': 'https://x/lazy-$no.jpg.2',
+        'pdfUrl': 'https://x/p$no.pdf',
+      };
+    }
     if (method == 'issue.parse') {
       return {
         'date': '2026-10-29',
@@ -57,6 +69,20 @@ void main() {
     expect(find.textContaining('2026年10月29日'), findsOneWidget);
     expect(find.textContaining('20 版'), findsOneWidget);
     expect(find.byType(PageThumb), findsNWidgets(20));
+  });
+
+  testWidgets('缩略图缺失时按需补抓每一版', (tester) async {
+    tester.view.physicalSize = const Size(1600, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final engine = FakeEngine();
+    await tester.pumpWidget(wrap(const LibraryView(), engine));
+    await tester.pumpAndSettle();
+
+    // 假数据的 pages 都没有 thumbUrl，界面应逐版调用 issue.page
+    final lazyCalls = engine.calls.where((c) => c == 'issue.page').length;
+    expect(lazyCalls, greaterThan(5), reason: '可见的每一版都要补抓缩略图');
   });
 
   testWidgets('已归档日期显示已下载按钮', (tester) async {

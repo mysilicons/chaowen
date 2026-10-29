@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 import time
 from collections.abc import Callable, Iterator
@@ -48,7 +49,8 @@ class HttpClient:
         )
         self._own_client = client is None
         self._headers = {"User-Agent": user_agent}
-        self._limiter = limiter or TokenBucket()
+        default_rate = float(os.environ.get("RMRB_RATE", "2"))
+        self._limiter = limiter or TokenBucket(rate=default_rate, burst=1.0)
         self._attempts = attempts
         self._backoff = backoff
         self._jitter = jitter

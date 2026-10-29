@@ -56,6 +56,7 @@ class Engine:
             "issue.status": self.issue_status,
             "library.month": self.library_month,
             "article.page": self.article_page,
+            "issue.page": self.issue_page,
             "download.start": self.download_start,
             "batch.start": self.batch_start,
             "storage.reveal": self.storage_reveal,
@@ -184,6 +185,50 @@ class Engine:
             subprocess.Popen(["xdg-open", str(target if target.is_dir() else target.parent)])  # noqa: S603
 
         return {"ok": True, "path": str(target)}
+
+    def issue_page(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        """单版详情：缩略图、PDF 直链、本版文章。
+
+        未下载的日期，版面列表里只有第 01 版带图；界面按需对每一版调这个方法，
+        解析结果会写进 pages 表，第二次打开零请求。
+        """
+        d = parse_date(params)
+        report = params.get("pageNo")
+        if not isinstance(report, int) or not 1 <= report <= 40:
+            raise EngineError(ErrorCode.BAD_REQUEST, "pageNo 非法")
+
+        record = self.repo.get_page(d, report)
+        if record and record["thumb_url"]:
+            return {
+                "no": report,
+                "title": record["title"],
+                "thumbUrl": record["thumb_url"],
+                "pdfUrl": record["pdf_url"],
+                "articles": [],
+            }
+
+        from .core.paths import layout_url
+        from .site.parser import parse_page_detail
+
+        node_url = layout_url(d).replace("node_01.html", f"node_{report:02d}.html")
+        html = self.service.http.get_text(node_url)
+        page = parse_page_detail(html, node_url, no=report)
+
+        self.repo.save_page(
+            d,
+            report,
+            status="parsed",
+            title=page.title,
+            pdf_url=page.pdf_url,
+            thumb_url=page.thumb_url,
+        )
+        return {
+            "no": page.no,
+            "title": page.title,
+            "thumbUrl": page.thumb_url,
+            "pdfUrl": page.pdf_url,
+            "articles": [a.model_dump(by_alias=True) for a in page.articles],
+        }
 
     def article_page(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
         d = parse_date(params)

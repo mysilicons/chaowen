@@ -18,6 +18,10 @@ class ReaderView extends ConsumerStatefulWidget {
 class _ReaderViewState extends ConsumerState<ReaderView> {
   final PdfViewerController _pdfController = PdfViewerController();
 
+  // 一旦打开过就保持挂载：反复切换模式时不用重新加载几十 MB 的 PDF
+  bool _pdfOpened = false;
+  bool _textOpened = false;
+
   @override
   Widget build(BuildContext context) {
     final target = ref.watch(readerTargetProvider);
@@ -63,22 +67,42 @@ class _ReaderViewState extends ConsumerState<ReaderView> {
                 },
               ),
               const VerticalDivider(width: 1, color: AppColors.border),
-              Expanded(
-                child: mode == 'pdf'
-                    ? _PdfPane(path: mergedPath, pageNo: pageNo, controller: _pdfController)
-                    : _TextPane(
-                        key: ValueKey('text-${target.date}-$pageNo'),
-                        date: target.date,
-                        pageNo: pageNo,
-                        page: page,
-                        scale: scale,
-                        onSwitchToPdf: () =>
-                            ref.read(readerModeProvider.notifier).select('pdf'),
-                      ),
-              ),
+              Expanded(child: _body(target.date, pageNo, page, scale, mode, mergedPath)),
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _body(
+    String date,
+    int pageNo,
+    PageInfo? page,
+    double scale,
+    String mode,
+    String? mergedPath,
+  ) {
+    if (mode == 'pdf') _pdfOpened = true;
+    if (mode == 'text') _textOpened = true;
+
+    return IndexedStack(
+      index: mode == 'pdf' ? 0 : 1,
+      children: [
+        _pdfOpened
+            ? _PdfPane(path: mergedPath, pageNo: pageNo, controller: _pdfController)
+            : const SizedBox.shrink(),
+        _textOpened
+            ? _TextPane(
+                key: ValueKey('text-$date-$pageNo'),
+                date: date,
+                pageNo: pageNo,
+                page: page,
+                scale: scale,
+                onSwitchToPdf: () =>
+                    ref.read(readerModeProvider.notifier).select('pdf'),
+              )
+            : const SizedBox.shrink(),
       ],
     );
   }

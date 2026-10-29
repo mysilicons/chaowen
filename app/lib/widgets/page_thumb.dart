@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
+import '../state/providers.dart';
 import '../theme/tokens.dart';
 
 /// 版面缩略图卡片：图上、版号角标。
-class PageThumb extends StatelessWidget {
-  const PageThumb({super.key, required this.page, this.onTap, this.state});
+class PageThumb extends ConsumerWidget {
+  const PageThumb({
+    super.key,
+    required this.date,
+    required this.page,
+    this.onTap,
+    this.state,
+  });
 
+  final String date;
   final PageInfo page;
   final VoidCallback? onTap;
   final DayState? state;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
@@ -25,7 +34,7 @@ class PageThumb extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  _image(),
+                  _image(ref),
                   Positioned(
                     left: 0,
                     top: 0,
@@ -64,8 +73,15 @@ class PageThumb extends StatelessWidget {
     );
   }
 
-  Widget _image() {
-    final url = page.thumbUrl;
+  Widget _image(WidgetRef ref) {
+    final direct = page.thumbUrl;
+    final String? url;
+    if (direct != null && direct.isNotEmpty) {
+      url = direct;
+    } else {
+      // 未下载的日期只有 01 版带图；其余按需抓一次并写进库
+      url = ref.watch(pageDetailProvider((date: date, no: page.no))).value?.thumbUrl;
+    }
     if (url == null || url.isEmpty) return const _ThumbPlaceholder();
     return Image.network(
       url,

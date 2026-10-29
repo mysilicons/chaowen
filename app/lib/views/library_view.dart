@@ -195,7 +195,7 @@ class _IssueBody extends StatelessWidget {
                   itemCount: data.pages.length,
                   itemBuilder: (context, index) {
                     final page = data.pages[index];
-                    return PageThumb(page: page, onTap: () => onOpen(page));
+                    return PageThumb(date: date, page: page, onTap: () => onOpen(page));
                   },
                 );
               },
