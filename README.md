@@ -53,6 +53,15 @@ _probe/     线上抓取的真实样本（测试夹具）
 > **Windows 必读**：必须开启「设置 → 系统 → 开发者选项 → 开发人员模式」。
 > 否则任何含插件的 `flutter build windows` 都会失败并提示 `Building with plugins requires symlink support`。
 
+## 安装
+
+双击 `dist\朝闻-0.1.0-setup.exe`：
+
+- 安装到 `%LOCALAPPDATA%\Programs\ChaoWen`（当前用户，不需要管理员）
+- 创建桌面与开始菜单快捷方式
+- 控制面板 →「朝闻 · 人民日报阅报器」可卸载
+- 卸载**不会**删除已下载的报纸和缓存（会提示路径）
+
 ## 快速开始
 
 **用打包好的版本**：运行 `scripts/package.ps1`，产物在 `dist\人民日报阅报器\`，双击 `rmrb_reader.exe` 即可（不需要装 Python 或 Flutter）。
