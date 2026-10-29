@@ -235,6 +235,12 @@ final helloProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   return raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
 });
 
+/// 是否已完成首次引导
+final settingsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final raw = await ref.watch(engineProvider).call('settings.get');
+  return raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
+});
+
 /// 某期是否已合并（阅读器需要 mergedPath）
 final issueStatusProvider =
     FutureProvider.family<Map<String, dynamic>, String>((ref, isoDate) async {

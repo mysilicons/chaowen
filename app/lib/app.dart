@@ -7,6 +7,7 @@ import 'state/providers.dart';
 import 'theme/palette.dart';
 import 'views/downloads_view.dart';
 import 'views/library_view.dart';
+import 'views/onboarding_view.dart';
 import 'views/settings_view.dart';
 import 'views/reader_view.dart';
 
@@ -72,7 +73,7 @@ class _BootstrapGateState extends State<BootstrapGate> {
     final status = widget.engine.status.value;
 
     if (status == EngineState.ready) {
-      return const HomeShell();
+      return const _ReadyGate();
     }
     if (status == EngineState.failed || status == EngineState.crashed) {
       return _Splash(
@@ -362,6 +363,46 @@ class _AboutButton extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// 引擎就绪后，先判断用户是不是第一次来
+class _ReadyGate extends ConsumerStatefulWidget {
+  const _ReadyGate();
+
+  @override
+  ConsumerState<_ReadyGate> createState() => _ReadyGateState();
+}
+
+class _ReadyGateState extends ConsumerState<_ReadyGate> {
+  bool _onboarded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_onboarded) return const HomeShell();
+
+    final settings = ref.watch(settingsProvider);
+    return settings.when(
+      loading: () => const _Splash(
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+      error: (error, _) => HomeShell(),
+      data: (data) {
+        if (data['onboarded'] == true) {
+          // 已引导过：直接进主界面（不能在 build 里改状态，推到下一帧）
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_onboarded) setState(() => _onboarded = true);
+          });
+          return const _Splash(child: SizedBox.shrink());
+        }
+        return OnboardingView(
+          onDone: () {
+            if (mounted) setState(() => _onboarded = true);
+          },
+        );
+      },
     );
   }
 }

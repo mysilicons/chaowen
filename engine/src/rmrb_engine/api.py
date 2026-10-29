@@ -225,16 +225,23 @@ class Engine:
         self._emit("job.finished", {"jobId": job_id, "ok": True, "days": days})
 
     def settings_get(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        data = settings.load()
         return {
             "downloadDir": str(self.service.paths.library),
             "cacheDir": str(self.service.paths.cache),
             "speedProfile": os.environ.get("RMRB_RATE", "2"),
+            "onboarded": bool(data.get("onboarded")),
         }
 
     def settings_set(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        if params.get("onboarded") is True:
+            settings.save({"onboarded": True})
+
         raw = params.get("downloadDir")
+        if raw is None:
+            return self.settings_get(params, ctx)
         if not isinstance(raw, str) or not raw.strip():
-            raise EngineError(ErrorCode.BAD_REQUEST, "缺少 downloadDir")
+            raise EngineError(ErrorCode.BAD_REQUEST, "downloadDir 非法")
         target = Path(raw).expanduser()
         try:
             target.mkdir(parents=True, exist_ok=True)
