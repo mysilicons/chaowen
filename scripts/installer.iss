@@ -16,6 +16,9 @@ AppPublisher=个人项目
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
+DisableDirPage=no
+UsePreviousAppDir=yes
+DirExistsWarning=auto
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=D:\YTH\code\rmrb\dist
@@ -55,6 +58,15 @@ ClickNext=点击「下一步」继续，或点击「取消」退出安装程序�
 CreateDesktopIcon=创建桌面快捷方式(&D)
 LaunchProgram=立即运行朝闻(&L)
 
+[Messages]
+PrivilegesRequiredOverrideTitle=选择安装方式
+PrivilegesRequiredOverrideInstruction=请选择 [name] 的安装方式。
+PrivilegesRequiredOverrideText1=仅为当前用户安装，不需要管理员权限。
+PrivilegesRequiredOverrideText2=为所有用户安装，需要管理员权限。
+PrivilegesRequiredOverrideAllUsers=为所有用户安装(&A)
+PrivilegesRequiredOverrideCurrentUser=仅为当前用户安装(&M)
+PrivilegesRequiredOverrideAllUsersRecommended=为所有用户安装（推荐）(&A)
+PrivilegesRequiredOverrideCurrentUserRecommended=仅为当前用户安装（推荐）(&M)
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "附加任务:"; Flags: checkedonce
 
@@ -71,6 +83,8 @@ Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram}"; Flags: nowait po
 [UninstallDelete]
 ; 只清安装目录里的程序文件，不碰下载目录与用户缓存
 Type: filesandordirs; Name: "{app}\data"
+
+
 
 
 
