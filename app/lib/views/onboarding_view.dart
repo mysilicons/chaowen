@@ -33,7 +33,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '人民日报',
+                '朝闻',
                 style: TextStyle(
                   fontFamily: AppFonts.serif,
                   fontFamilyFallback: AppFonts.fallback,
@@ -45,7 +45,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
               ),
               const SizedBox(height: 4),
               Text(
-                '朝 闻 · 第一次使用',
+                '第一次使用 · 人民日报电子版阅读器',
                 style: TextStyle(
                   fontFamily: AppFonts.serif,
                   fontFamilyFallback: AppFonts.fallback,

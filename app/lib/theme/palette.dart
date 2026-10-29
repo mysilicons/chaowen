@@ -108,7 +108,7 @@ extension AppPaletteContext on BuildContext {
 
 /// 设计令牌：字体族。
 abstract final class AppFonts {
-  static const serif = 'SourceHanSerifSC';
+  static const serif = 'ChaoWenSerif';
 
   static const fallback = <String>[
     'Microsoft YaHei',

@@ -69,7 +69,7 @@ flutter:
     - assets/fonts/OFL.txt
 
   fonts:
-    - family: SourceHanSerifSC
+    - family: ChaoWenSerif
       fonts:
         - asset: assets/fonts/SourceHanSerifSC-Regular.ttf
           weight: 400

@@ -137,7 +137,7 @@ class _Splash extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '人民日报',
+              '朝闻',
               style: TextStyle(
                 fontFamily: AppFonts.serif,
                   fontFamilyFallback: AppFonts.fallback,
@@ -232,7 +232,7 @@ class _Sidebar extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '人民日报',
+                          '朝闻',
                           style: TextStyle(
                             fontFamily: AppFonts.serif,
                             fontFamilyFallback: AppFonts.fallback,
@@ -244,7 +244,7 @@ class _Sidebar extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          '朝 闻',
+                          '人民日报电子版',
                           style: TextStyle(
                             fontFamily: AppFonts.serif,
                             fontFamilyFallback: AppFonts.fallback,

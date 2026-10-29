@@ -14,7 +14,7 @@ Future<void> main() async {
     size: Size(1280, 820),
     minimumSize: Size(1024, 700),
     center: true,
-    title: '朝闻 · 人民日报',
+    title: '朝闻',
   );
   await windowManager.waitUntilReadyToShow(options, () async {
     await windowManager.show();

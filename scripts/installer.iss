@@ -1,4 +1,4 @@
-; 朝闻 · 人民日报阅报器 —— Inno Setup 安装脚本
+; 朝闻 —— Inno Setup 安装脚本
 ; 编译：ISCC.exe chaowen.iss
 
 #define AppName "朝闻"

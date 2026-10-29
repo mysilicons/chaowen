@@ -57,7 +57,7 @@ def build_engine(library: Path, cache: Path) -> Engine:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="rmrb-engine", description="人民日报阅报器引擎")
+    parser = argparse.ArgumentParser(prog="rmrb-engine", description="朝闻引擎")
     parser.add_argument("--version", action="store_true", help="打印版本号")
     parser.add_argument("--parse", metavar="HTML", help="解析本地版面页 HTML")
     parser.add_argument("--article", metavar="HTML", help="解析本地正文页 HTML")
