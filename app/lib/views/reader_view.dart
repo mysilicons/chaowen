@@ -121,6 +121,7 @@ class _ReaderBar extends ConsumerWidget {
             date,
             style: const TextStyle(
               fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -459,6 +460,7 @@ class _TextPaneState extends ConsumerState<_TextPane> {
                   article.title,
                   style: TextStyle(
                     fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                     fontSize: 22 * scale,
                     fontWeight: FontWeight.w700,
                     height: 1.5,
@@ -483,6 +485,7 @@ class _TextPaneState extends ConsumerState<_TextPane> {
                         '\u3000\u3000${block.text}',
                         style: TextStyle(
                           fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                           fontSize: 17 * scale,
                           height: 1.9,
                           color: AppColors.text,

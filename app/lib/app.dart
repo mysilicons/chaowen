@@ -135,6 +135,7 @@ class _Splash extends StatelessWidget {
               '人民日报',
               style: TextStyle(
                 fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                 fontSize: 34,
                 fontWeight: FontWeight.w700,
                 color: AppColors.brand,
@@ -146,6 +147,7 @@ class _Splash extends StatelessWidget {
               '阅报器',
               style: TextStyle(
                 fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                 fontSize: 13,
                 color: AppColors.text2,
                 letterSpacing: 6,
@@ -211,6 +213,7 @@ class _Sidebar extends StatelessWidget {
                   '人民日报',
                   style: TextStyle(
                     fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                     color: AppColors.brand,
@@ -222,6 +225,7 @@ class _Sidebar extends StatelessWidget {
                   '阅 报 器',
                   style: TextStyle(
                     fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                     fontSize: 11,
                     color: AppColors.text2,
                     letterSpacing: 2,

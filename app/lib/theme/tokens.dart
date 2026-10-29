@@ -15,8 +15,17 @@ abstract final class AppColors {
 
 /// 设计令牌：字体族。
 abstract final class AppFonts {
-  /// 思源宋体子集（GB2312，静态 400/700），用于报头、标题与正文。
+  /// 思源宋体完整字库（静态 400/700，6.5 万字形），用于报头、标题与正文。
   static const serif = 'SourceHanSerifSC';
+
+  /// 兜底链：完整字库已覆盖 CJK，这里只处理极少数缺字与西文符号。
+  /// 顺序按平台常见字体排，最后落到系统 UI 字体。
+  static const fallback = <String>[
+    'Microsoft YaHei',
+    'PingFang SC',
+    'Noto Sans CJK SC',
+    'Segoe UI',
+  ];
 }
 
 ThemeData buildLightTheme() {
@@ -27,6 +36,7 @@ ThemeData buildLightTheme() {
 
   return ThemeData(
     useMaterial3: true,
+    fontFamilyFallback: AppFonts.fallback,
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.paper,
     dividerColor: AppColors.border,

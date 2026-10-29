@@ -18,11 +18,14 @@ app/.flutter-plugins-dependencies
 app/windows/flutter/ephemeral/
 app/assets/engine/
 
-# ---- 字体：源文件不入库，子集入库 ----
+# ---- 字体 ----
+# 源可变字体与生成的中间产物都不入库；
+# 只提交 app/assets/fonts 下最终使用的那两个文件，保证 clone 后可直接构建。
 fonts/*.otf
 fonts/*.woff2
 fonts/SourceHanSerifSC-VF.ttf
-!fonts/subset/*.ttf
+fonts/full/
+fonts/app/
 
 # ---- 运行产物 ----
 *.log

@@ -47,6 +47,7 @@ class LibraryView extends ConsumerWidget {
                 '${date.year}年${date.month}月${date.day}日 星期${_weekdays[date.weekday - 1]}',
                 style: const TextStyle(
                   fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                   fontSize: 19,
                   fontWeight: FontWeight.w700,
                   color: AppColors.text,
@@ -91,6 +92,7 @@ class _MonthHeader extends ConsumerWidget {
             '${month.year}年${month.month}月',
             style: const TextStyle(
               fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
               fontSize: 22,
               fontWeight: FontWeight.w700,
               color: AppColors.text,

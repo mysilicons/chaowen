@@ -43,6 +43,10 @@ if (Test-Path $Out) { Remove-Item -Recurse -Force $Out }
 New-Item -ItemType Directory -Force $Out | Out-Null
 Copy-Item -Recurse (Join-Path $release '*') $Out
 
+# 字体许可证（OFL 要求随字体一起分发）
+$ofl = Join-Path $root 'fonts\OFL.txt'
+if (Test-Path $ofl) { Copy-Item $ofl (Join-Path $Out 'OFL.txt') -Force }
+
 $size = (Get-ChildItem $Out -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
 Write-Host ("完成：{0}（{1:N1} MB）" -f $Out, $size) -ForegroundColor Green
 Write-Host '运行：双击目录内的 rmrb_reader.exe'

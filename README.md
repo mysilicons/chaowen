@@ -18,7 +18,7 @@
 | P1 | 引擎核心 | ✅ 已完成（78 单测 + G1 验收） |
 | P2 | 链路打通 | ✅ 已完成（书架 + 下载中心） |
 | P3 | 双模式阅读 | ✅ 已完成（PDF + 文字） |
-| P4 | 打磨交付 | ✅ 已完成（便携目录 94.3 MB） |
+| P4 | 打磨交付 | ✅ 已完成（便携目录 151 MB，含完整字库） |
 
 ## 架构
 
@@ -76,13 +76,15 @@ pwsh scripts/package.ps1
 
 ## 字体
 
-`fonts/` 下是思源宋体可变字体源文件。应用使用经实例化与 GB2312 裁剪的子集（`fonts/subset/`，各约 5.47 MB）：
+`fonts/` 下是思源宋体可变字体源文件。应用打包的是**完整字库**的静态实例（各 33.9 MB / 6.5 万字），由脚本生成：
 
 ```powershell
-uv run --with fonttools python scripts/subset_fonts.py
+uv run --with fonttools python scripts/build_fonts.py            # 完整字库（默认）
+uv run --with fonttools python scripts/build_fonts.py --subset   # GB2312 子集（体积敏感时）
 ```
 
-> 源字体是可变字体（`wght` 250–900，**默认 250**），直接使用会得到极细的字重，必须走上述子集流程。
+> 源字体是可变字体（`wght` 250–900，**默认 250**），直接使用会得到极细的字重，必须先实例化。
+> 字体许可为 SIL OFL 1.1，`fonts/OFL.txt` 随发布包分发。
 
 ## 许可证
 

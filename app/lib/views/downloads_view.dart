@@ -42,6 +42,7 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
                 '下载中心',
                 style: TextStyle(
                   fontFamily: AppFonts.serif,
+                  fontFamilyFallback: AppFonts.fallback,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
