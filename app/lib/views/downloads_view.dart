@@ -258,13 +258,13 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
   }
 }
 
-class _JobTile extends StatelessWidget {
+class _JobTile extends ConsumerWidget {
   const _JobTile({required this.job});
 
   final DownloadJob job;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final failed = job.status == 'failed';
     final finished = job.status == 'finished' || job.status == 'archived';
 
@@ -298,6 +298,20 @@ class _JobTile extends StatelessWidget {
                   job.error!,
                   style: TextStyle(fontSize: 11, color: context.colors.brandHover),
                 ),
+              if (job.status == 'running' || job.status == 'paused' || job.status == 'queued') ...[
+                TextButton(
+                  onPressed: () => _pause(context, ref),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  child: Text(job.paused ? '继续' : '暂停',
+                      style: const TextStyle(fontSize: 12)),
+                ),
+                TextButton(
+                  onPressed: () => _cancel(context, ref),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  child: Text('取消',
+                      style: TextStyle(fontSize: 12, color: context.colors.brandHover)),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -315,6 +329,31 @@ class _JobTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _pause(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(queueProvider.notifier);
+    final next = !job.paused;
+    try {
+      await ref.read(engineProvider).call(
+        next ? 'download.pause' : 'download.resume',
+        {'jobId': job.jobId},
+      );
+      notifier.markPaused(job.jobId, next);
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('操作失败：$error')));
+    }
+  }
+
+  Future<void> _cancel(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(engineProvider).call('download.cancel', {'jobId': job.jobId});
+      messenger.showSnackBar(const SnackBar(content: Text('已取消')));
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('取消失败：$error')));
+    }
   }
 }
 

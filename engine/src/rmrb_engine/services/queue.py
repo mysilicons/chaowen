@@ -20,6 +20,7 @@ from ..net.client import HttpClient
 from ..net.downloader import download
 from ..site.parser import parse_layout, parse_page_detail
 from ..store.repo import Repo
+from .control import Cancelled, IssueControl
 from .merge import merge_issue
 
 Emitter = Callable[[str, dict], None]
@@ -82,6 +83,7 @@ class DownloadService:
         job_id: str = "local",
         merge: bool = True,
         delete_singles: bool = True,
+        control: IssueControl | None = None,
     ) -> IssueResult:
         issue = self.fetch_issue(d)
         targets = [p for p in issue.pages if pages is None or p.no in pages]
@@ -107,6 +109,12 @@ class DownloadService:
             return result
 
         for index, page in enumerate(targets, start=1):
+            if control is not None:
+                try:
+                    control.checkpoint()
+                except Cancelled:
+                    self.repo.save_issue(d, page_count=issue.page_count, status="partial")
+                    raise
             outcome = self._process_page(d, page)
             result.pages.append(outcome)
             if outcome.status == "done":

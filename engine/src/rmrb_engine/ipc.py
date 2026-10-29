@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from typing import Any, TextIO
 
 from .core.errors import EngineError, ErrorCode
@@ -37,12 +38,15 @@ class RpcServer:
         self.out = out
         self.engine.bind_emitter(self.write_event)
         self._responded = False
+        self._write_lock = threading.Lock()
 
     # ---- 输出 ----
 
     def write(self, payload: dict[str, Any]) -> None:
-        self.out.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        self.out.flush()
+        # 下载跑在工作线程里，事件和响应会并发写，必须串行化
+        with self._write_lock:
+            self.out.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            self.out.flush()
 
     def write_ok(self, request_id: Any, result: Any) -> None:
         self._responded = True

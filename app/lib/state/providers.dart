@@ -65,6 +65,7 @@ class DownloadJob {
   int total = 0;
   int currentPage = 0;
   String status = 'running';
+  bool paused = false;
   String? error;
 
   double get progress => total == 0 ? 0 : done / total;
@@ -141,6 +142,13 @@ class QueueNotifier extends Notifier<List<DownloadJob>> {
   }
 
   void add(DownloadJob job) => state = [...state, job];
+
+  void markPaused(String jobId, bool paused) {
+    _update(jobId, (job) {
+      job.paused = paused;
+      job.status = paused ? 'paused' : 'running';
+    });
+  }
 
   void clearFinished() =>
       state = state.where((job) => job.status == 'running').toList(growable: false);

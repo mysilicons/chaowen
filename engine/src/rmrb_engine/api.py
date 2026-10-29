@@ -10,6 +10,8 @@ import os
 import platform
 import subprocess
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date as Date
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,7 @@ from .core.errors import EngineError, ErrorCode
 from .core.models import Issue, Page
 from .core.paths import LibraryPaths, layout_url
 from .services.article_service import ArticleService
+from .services.control import Cancelled, IssueControl
 from .services.queue import DownloadService
 from .store import settings
 from .store.repo import Repo
@@ -45,6 +48,10 @@ class Engine:
         self._emit = lambda _event, _data: None
         self._job_seq = 0
         self.articles = ArticleService(service.http, repo, service.paths)
+        # 下载串行执行（低速约束），但跑在工作线程里，主线程继续响应请求
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="job")
+        self._jobs: dict[str, IssueControl] = {}
+        self._jobs_lock = threading.Lock()
 
     def bind_emitter(self, emit: Any) -> None:
         # 服务层的事件必须走同一条通道，否则下载进度到不了客户端
@@ -62,6 +69,9 @@ class Engine:
             "article.page": self.article_page,
             "issue.page": self.issue_page,
             "download.start": self.download_start,
+            "download.pause": self.download_pause,
+            "download.resume": self.download_resume,
+            "download.cancel": self.download_cancel,
             "batch.start": self.batch_start,
             "storage.reveal": self.storage_reveal,
             "settings.get": self.settings_get,
@@ -326,13 +336,47 @@ class Engine:
         self._job_seq += 1
         job_id = f"{d:%Y%m%d}-{self._job_seq}"
 
-        # 先回执，再推事件：客户端不应阻塞等待任务完成
+        control = IssueControl()
+        with self._jobs_lock:
+            self._jobs[job_id] = control
+
+        # 先回执，再让工作线程干活：客户端不会因为下载而卡住
         ctx.respond({"jobId": job_id})
 
-        try:
-            # 成功路径的 job.finished 由服务层发出，这里不重复
-            self.service.run_issue(d, pages=pages, job_id=job_id)
-        except EngineError as exc:
-            self._emit(
-                "job.finished", {"jobId": job_id, "ok": False, "error": exc.to_envelope()}
-            )
+        def work() -> None:
+            try:
+                self.service.run_issue(d, pages=pages, job_id=job_id, control=control)
+            except Cancelled:
+                self._emit("job.finished", {"jobId": job_id, "ok": False, "cancelled": True})
+            except EngineError as exc:
+                self._emit(
+                    "job.finished", {"jobId": job_id, "ok": False, "error": exc.to_envelope()}
+                )
+            finally:
+                with self._jobs_lock:
+                    self._jobs.pop(job_id, None)
+
+        self._executor.submit(work)
+
+    def download_pause(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        self._control(params).pause()
+        return {"ok": True, "paused": True}
+
+    def download_resume(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        self._control(params).resume()
+        return {"ok": True, "paused": False}
+
+    def download_cancel(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
+        self._control(params).cancel()
+        return {"ok": True, "cancelled": True}
+
+    def _control(self, params: dict[str, Any]) -> IssueControl:
+        job_id = params.get("jobId")
+        if not isinstance(job_id, str):
+            raise EngineError(ErrorCode.BAD_REQUEST, "缺少 jobId")
+        with self._jobs_lock:
+            control = self._jobs.get(job_id)
+        if control is None:
+            raise EngineError(ErrorCode.BAD_REQUEST, f"任务不存在或已结束：{job_id}")
+        return control
+

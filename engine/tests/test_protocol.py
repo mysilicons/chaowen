@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import time
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -70,9 +71,20 @@ def make_server(tmp_path: Path, lines: list[str]) -> tuple[RpcServer, io.StringI
     return server, out
 
 
+def wait_jobs(out: io.StringIO, timeout: float = 5.0) -> None:
+    """下载已改为工作线程，测试必须等 job.finished 出现再断言。"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if '"job.finished"' in out.getvalue():
+            return
+        time.sleep(0.05)
+
+
 def run_lines(tmp_path: Path, lines: list[str]) -> list[dict[str, Any]]:
     server, out = make_server(tmp_path, lines)
     server.run()
+    if any("download.start" in line or "batch.start" in line for line in lines):
+        wait_jobs(out)
     raw = out.getvalue()
     parsed = []
     for line in raw.splitlines():
@@ -193,11 +205,13 @@ def test_every_output_line_is_valid_json(tmp_path: Path):
         req(8, "hello", {}),
         req(9, "issue.parse", {"date": "2026-10-29"}),
         req(10, "download.start", {"date": "2026-10-29"}),
-        req(11, "issue.status", {"date": "2026-10-29"}),
     ]
 
     server, out = make_server(tmp_path, raw_messages)
     server.run()
+    wait_jobs(out)
+    # 下载完成后再查状态，否则拿到的是下载前的快照
+    server.handle(req(11, "issue.status", {"date": "2026-10-29"}))
 
     lines = [line for line in out.getvalue().splitlines() if line.strip()]
     assert len(lines) >= 6
