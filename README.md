@@ -1,7 +1,7 @@
 # 朝闻 · 人民日报阅报器
 
 [![Release](https://img.shields.io/github/v/release/mysilicons/chaowen?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/mysilicons/chaowen/releases/latest)
-[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)](https://github.com/mysilicons/chaowen/releases/latest)
 
 一个**个人使用**的《人民日报》桌面阅报器：像翻报纸一样浏览版面，像读网页一样读正文，需要留档时一键下载并合成整期 PDF。
@@ -104,15 +104,9 @@ uv run --with fonttools python scripts/build_fonts.py --subset   # GB2312 子集
 
 ## 许可证
 
-本项目采用 **[PolyForm Noncommercial License 1.0.0](LICENSE)**（源码可见，但**不是** OSI 开源许可）。
+[MIT License](LICENSE) © 2026 mysilicons
 
-| 你可以 | 不可以 |
-| --- | --- |
-| 个人学习、研究、自用存档 | **任何商业用途**（含公司内部使用、收费服务、随产品分发） |
-| 修改源码、二次开发 | 移除版权与许可声明后再分发 |
-| 分发副本（须附带本协议） | 用于经营性用途 |
-
-一句话：自己怎么用都行，别拿去赚钱。
+可自由使用、修改、分发、商用，保留版权与许可声明即可。
 
 字体为**思源宋体**，遵循 [SIL Open Font License 1.1](fonts/OFL.txt)，可自由使用与再分发。
 本项目不存储、不传播任何报纸内容，仅在用户本地保存其自行下载的文件。
