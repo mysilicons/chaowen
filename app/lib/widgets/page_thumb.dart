@@ -109,7 +109,7 @@ class _ThumbPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFF1EEE7),
+      color: context.colors.paper,
       alignment: Alignment.center,
       child: Icon(Icons.article_outlined, size: 20, color: context.colors.text2),
     );

@@ -326,9 +326,7 @@ class _ModeSwitch extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: context.colors.isDark
-            ? context.colors.paper
-            : const Color(0xFFF1EEE7),
+        color: context.colors.paper,
         borderRadius: BorderRadius.circular(7),
       ),
       child: Row(
@@ -503,7 +501,7 @@ class _PdfPane extends StatelessWidget {
       key: ValueKey(file),
       controller: controller,
       initialPageNumber: pageNo,
-      params: const PdfViewerParams(backgroundColor: Color(0xFFF1EEE7), margin: 12),
+      params: PdfViewerParams(backgroundColor: context.colors.paper, margin: 12),
     );
   }
 }
@@ -736,9 +734,7 @@ class _ArticleNav extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: context.colors.isDark
-                    ? context.colors.paper
-                    : const Color(0xFFF6F3EC),
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: context.colors.border),
               ),

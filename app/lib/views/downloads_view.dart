@@ -170,8 +170,20 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
   Widget _preset(String label, int days) {
     final c = context.colors;
     return ActionChip(
-      label: Text(label, style: TextStyle(fontSize: 12, color: c.text)),
-      labelStyle: TextStyle(fontSize: 12, color: c.text),
+      // 用接近纯黑的字色 + 中等字重：12px 的宋体/无衬线在浅底上容易显得发灰
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: c.isDark ? c.text : const Color(0xFF111111),
+        ),
+      ),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: c.isDark ? c.text : const Color(0xFF111111),
+      ),
       onPressed: () {
         final now = DateTime.now();
         setState(() {
@@ -184,8 +196,9 @@ class _DownloadsViewState extends ConsumerState<DownloadsView> {
           };
         });
       },
-      backgroundColor: const Color(0xFFF6F3EC),
-      side: BorderSide(color: context.colors.border),
+      backgroundColor: c.surface,
+      side: BorderSide(color: c.border),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
     );
   }
 
