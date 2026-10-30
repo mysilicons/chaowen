@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
@@ -13,9 +14,75 @@ from ..core.models import Block
 from ..core.zaobao_models import ZaobaoArticle, ZaobaoSummary
 
 FEED_URL = "https://www.zaobao.com/news/china"
+MORE_BASE = "https://zbapi.zbstatic5.com/more/sitemap/8"
+PAGE_SIZE = 27
 STORY = re.compile(r"/news/china/story\d{8}-(\d{1,20})/?$")
 MEDIA_HOSTS = frozenset({"dss0.zbstatic5.com", "cassette.sphdigital.com.sg"})
 REMOVE = "script,style,aside,nav,.further-reading,.read-on-app-cover,[data-testid='related-words'],[data-testid='paywall'],.paywall,.advertisement"
+
+
+def more_url(page: int) -> str:
+    if type(page) is not int or not 2 <= page <= 1000:
+        raise EngineError(ErrorCode.BAD_REQUEST, "早报分页页码非法")
+    return f"{MORE_BASE}?pageNo={page}&pageSize={PAGE_SIZE}"
+
+
+def parse_more(payload: object, page: int) -> tuple[list[ZaobaoSummary], bool]:
+    if not isinstance(payload, dict) or payload.get("code") not in {"00000", "200"}:
+        raise ParseError("早报历史列表返回失败")
+    result = payload.get("result")
+    if (
+        not isinstance(result, dict)
+        or result.get("pageNo") != page
+        or not isinstance(result.get("data"), list)
+    ):
+        raise ParseError("早报分页结构已变化")
+    records = result["data"]
+    items: dict[str, ZaobaoSummary] = {}
+    for record in records:
+        item = _more_item(record)
+        if item:
+            items.setdefault(item.article_id, item)
+    if records and not items:
+        raise ParseError("早报历史列表未找到有效中国新闻")
+    total = result.get("total")
+    has_more = bool(records) and (type(total) is not int or page * PAGE_SIZE < total)
+    return list(items.values()), has_more
+
+
+def _more_item(record: object) -> ZaobaoSummary | None:
+    if not isinstance(record, dict) or not isinstance(record.get("url"), str):
+        return None
+    try:
+        url, identity = article_url(record["url"])
+    except (EngineError, ValueError):
+        return None
+    title = (
+        record.get("displayHeadlineZbcom") or record.get("displayHeadline") or record.get("title")
+    )
+    if not isinstance(title, str) or not title.strip():
+        return None
+    pictures = record.get("pictures") or []
+    image = pictures[0] if pictures and isinstance(pictures[0], dict) else {}
+    published = record.get("publicationDate")
+    try:
+        stamp = (
+            datetime.strptime(published, "%Y-%m-%d %H:%M:%S").isoformat() + "+08:00"
+            if isinstance(published, str)
+            else None
+        )
+    except ValueError:
+        stamp = None
+    preview = record.get("contentPreview") or record.get("digest")
+    return ZaobaoSummary(
+        article_id=identity,
+        title=title.strip(),
+        url=url,
+        published_at=stamp,
+        time_label=stamp,
+        excerpt=preview[:400] if isinstance(preview, str) else None,
+        thumbnail=media_url(image.get("thumbnail") or image.get("uri") or ""),
+    )
 
 
 def article_url(raw: str) -> tuple[str, str]:

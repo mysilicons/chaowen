@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urljoin, urlsplit
 
 import httpx
 
 from ..core.errors import EngineError, ErrorCode
 from ..services.control import Cancelled
-from ..site.zaobao import FEED_URL, article_url, media_url
+from ..site.zaobao import FEED_URL, MORE_BASE, article_url, media_url, more_url
+from .zaobao_signing import request_headers
 
 
 def check_cancel(cancel: threading.Event) -> None:
@@ -21,12 +23,21 @@ def check_cancel(cancel: threading.Event) -> None:
 
 
 def _check_url(url: str) -> None:
+    if url.startswith(MORE_BASE + "?"):
+        query = parse_qs(urlsplit(url).query)
+        try:
+            page = int(query["pageNo"][0])
+            if url == more_url(page):
+                return
+        except (KeyError, ValueError, EngineError):
+            pass
+        raise EngineError(ErrorCode.BAD_REQUEST, "不支持的早报分页地址")
     if url != FEED_URL and media_url(url) is None:
         article_url(url)
 
 
 class ZaobaoHttp:
-    def __init__(self, *, client: httpx.Client | None = None, interval: float = 10) -> None:
+    def __init__(self, *, client: httpx.Client | None = None, interval: float = 0.5) -> None:
         self.client = client or httpx.Client(
             timeout=httpx.Timeout(20, connect=10),
             follow_redirects=False,
@@ -48,10 +59,38 @@ class ZaobaoHttp:
         except UnicodeDecodeError as exc:
             raise EngineError(ErrorCode.BAD_RESPONSE, "早报页面不是有效 UTF-8") from exc
 
-    def request(self, url: str, cancel: threading.Event, *, max_bytes: int) -> tuple[bytes, str]:
+    def json(self, url: str, cancel: threading.Event) -> object:
+        _check_url(url)
+        page = int(parse_qs(urlsplit(url).query)["pageNo"][0])
+        data, kind = self.request(
+            url,
+            cancel,
+            max_bytes=5 * 1024 * 1024,
+            headers={
+                **request_headers(page),
+                "Accept": "application/json",
+                "Origin": "https://www.zaobao.com",
+                "Referer": FEED_URL,
+            },
+        )
+        if "application/json" not in kind:
+            raise EngineError(ErrorCode.BAD_RESPONSE, "早报分页返回的不是 JSON")
+        try:
+            return json.loads(data)
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise EngineError(ErrorCode.BAD_RESPONSE, "早报分页返回无效 JSON") from exc
+
+    def request(
+        self,
+        url: str,
+        cancel: threading.Event,
+        *,
+        max_bytes: int,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[bytes, str]:
         _check_url(url)
         with self._lock:
-            return self._request(url, cancel, max_bytes)
+            return self._request(url, cancel, max_bytes, headers)
 
     def _wait(self, cancel: threading.Event) -> None:
         if cancel.wait(max(0, self._next_request - time.monotonic())):
@@ -59,13 +98,17 @@ class ZaobaoHttp:
         check_cancel(cancel)
         self._next_request = time.monotonic() + self.interval
 
-    def _request(self, url: str, cancel: threading.Event, maximum: int) -> tuple[bytes, str]:
+    def _request(
+        self, url: str, cancel: threading.Event, maximum: int, headers: dict[str, str] | None = None
+    ) -> tuple[bytes, str]:
         redirects = 0
         for attempt in range(3):
             try:
                 while True:
                     self._wait(cancel)
-                    with self.client.stream("GET", url, follow_redirects=False) as response:
+                    with self.client.stream(
+                        "GET", url, follow_redirects=False, headers=headers
+                    ) as response:
                         if response.is_redirect:
                             url = urljoin(url, response.headers.get("location", ""))
                             _check_url(url)

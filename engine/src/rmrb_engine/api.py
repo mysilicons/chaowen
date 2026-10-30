@@ -62,6 +62,7 @@ class Engine:
         self.service.emit = emit
         self.articles.emit = emit
         self.zaobao.emit = emit
+        self.zaobao.service.emit = emit
 
     @property
     def handlers(self) -> dict[str, Any]:

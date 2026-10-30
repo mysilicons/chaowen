@@ -36,9 +36,9 @@ def test_feed_refresh_never_fetches_article_and_cache_is_offline(tmp_path):
     article = service.article("1234567")
     assert article["cached"] is True
     assert article["article"]["blocks"][1]["text"] == "第一段加粗。"
-    requests = len(urls)
+    requests = urls.count(URL)
     service.fetch_article("1234567", threading.Event())
-    assert len(urls) == requests
+    assert urls.count(URL) == requests
     service.close()
 
 
@@ -90,7 +90,11 @@ def test_v1_upgrade_preserves_data_and_reopens(tmp_path):
             "INSERT INTO issues(date,status,updated_at) VALUES('2026-10-29','archived','now')"
         )
     db = Database(path)
-    assert db.conn.execute("SELECT value FROM schema_meta WHERE key='version'").fetchone()[0] == "2"
+    from rmrb_engine.store.db import SCHEMA_VERSION
+
+    assert db.conn.execute("SELECT value FROM schema_meta WHERE key='version'").fetchone()[
+        0
+    ] == str(SCHEMA_VERSION)
     assert db.conn.execute("SELECT status FROM issues").fetchone()[0] == "archived"
     db.close()
     assert Path(str(path) + ".v1.bak").exists()
@@ -137,9 +141,7 @@ def test_403_does_not_retry_and_size_limit_is_enforced():
         http.request(URL, threading.Event(), max_bytes=20)
 
 
-def test_cancel_while_loading_images_preserves_readable_text(tmp_path):
-    from rmrb_engine.services.control import Cancelled
-
+def test_image_failure_preserves_readable_text(tmp_path):
     cancel = threading.Event()
     seen = []
 
@@ -149,17 +151,19 @@ def test_cancel_while_loading_images_preserves_readable_text(tmp_path):
             return httpx.Response(200, text=FEED, headers={"content-type": "text/html"})
         if str(request.url) == URL:
             return httpx.Response(200, text=ARTICLE, headers={"content-type": "text/html"})
-        cancel.set()
-        return httpx.Response(
-            200, content=b"\x89PNG\r\n\x1a\n", headers={"content-type": "image/png"}
-        )
+        return httpx.Response(403)
 
     service = make_service(tmp_path, handler)
+    updated = threading.Event()
+    service.emit = lambda event, data: updated.set()
     service.refresh_feed(cancel)
-    with pytest.raises(Cancelled):
-        service.fetch_article("1234567", cancel)
+    service.fetch_article("1234567", cancel)
+    assert updated.wait(1)
     assert service.article("1234567")["article"]["blocks"][1]["text"] == "第一段加粗。"
-    assert len(seen) == 3  # feed, selected article, its first image; never related articles
+    assert service.article("1234567")["article"]["warnings"]
+    assert all(
+        url in {FEED_URL, URL} or url.startswith("https://dss0.zbstatic5.com/") for url in seen
+    )
     service.close()
 
 

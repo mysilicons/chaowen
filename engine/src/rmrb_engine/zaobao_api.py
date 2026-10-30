@@ -29,8 +29,11 @@ class ZaobaoAPI:
     @property
     def handlers(self) -> dict:
         return {
-            "zaobao.feed.get": lambda p, c: self.service.feed(),
+            "zaobao.feed.get": lambda p, c: self.service.feed(
+                p.get("offset", 0), p.get("limit", 60)
+            ),
             "zaobao.feed.refresh": lambda p, c: self.start("feed", None, False, c),
+            "zaobao.feed.more": lambda p, c: self.start("more", None, False, c),
             "zaobao.article.get": lambda p, c: self.service.article(p.get("articleId")),
             "zaobao.article.fetch": self.fetch,
             "zaobao.task.get": lambda p, c: self.task(p.get("jobId")),
@@ -90,6 +93,8 @@ class ZaobaoAPI:
         try:
             if task["kind"] == "feed":
                 self.service.refresh_feed(cancel)
+            elif task["kind"] == "more":
+                self.service.load_more(cancel)
             else:
                 self.service.fetch_article(task["articleId"], cancel, refresh=refresh)
             self._change(job, "succeeded")

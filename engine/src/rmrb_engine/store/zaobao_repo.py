@@ -21,35 +21,65 @@ class ZaobaoRepo:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def feed(self) -> dict:
+    def feed(self, offset: int = 0, limit: int = 60) -> dict:
         conn = self.db.conn
         # A single SELECT reads items and timestamp from the same WAL snapshot.
         rows = conn.execute(
-            "SELECT a.summary,a.body IS NOT NULL AS cached,a.read_at,(SELECT fetched_at FROM zaobao_feed_state WHERE id=1) AS fetched_at FROM zaobao_feed_items f JOIN zaobao_articles a USING(article_id) ORDER BY f.position"
+            "SELECT a.summary,a.body IS NOT NULL AS cached,a.read_at,(SELECT fetched_at FROM zaobao_feed_state WHERE id=1) AS fetched_at FROM zaobao_feed_items f JOIN zaobao_articles a USING(article_id) ORDER BY f.position LIMIT ? OFFSET ?",
+            (limit, offset),
         ).fetchall()
+        total = conn.execute("SELECT count(*) FROM zaobao_feed_items").fetchone()[0]
+        state = conn.execute(
+            "SELECT next_page,has_more FROM zaobao_feed_state WHERE id=1"
+        ).fetchone()
         return {
             "items": [
                 dict(json.loads(r["summary"]), cached=bool(r["cached"]), read=bool(r["read_at"]))
                 for r in rows
             ],
             "fetchedAt": rows[0]["fetched_at"] if rows else None,
+            "total": total,
+            "nextOffset": offset + len(rows) if offset + len(rows) < total else None,
+            "nextPage": state[0] if state else 2,
+            "hasMore": bool(state[1]) if state else True,
         }
 
-    def save_feed(self, items: list[ZaobaoSummary]) -> None:
+    def save_feed(
+        self,
+        items: list[ZaobaoSummary],
+        *,
+        append: bool = False,
+        next_page: int = 2,
+        has_more: bool = True,
+    ) -> None:
         with self.db.conn as conn:
-            conn.execute("DELETE FROM zaobao_feed_items")
-            for position, item in enumerate(items):
+            if not append:
+                conn.execute("DELETE FROM zaobao_feed_items")
+            position = conn.execute(
+                "SELECT coalesce(max(position)+1,0) FROM zaobao_feed_items"
+            ).fetchone()[0]
+            for item in items:
                 conn.execute(
                     "INSERT INTO zaobao_articles(article_id,summary,accessed_at) VALUES(?,?,?) ON CONFLICT(article_id) DO UPDATE SET summary=excluded.summary",
                     (item.article_id, item.model_dump_json(by_alias=True), now()),
                 )
                 conn.execute(
-                    "INSERT INTO zaobao_feed_items VALUES(?,?)", (position, item.article_id)
+                    "INSERT OR IGNORE INTO zaobao_feed_items VALUES(?,?)",
+                    (position, item.article_id),
                 )
+                position += 1
             conn.execute(
-                "INSERT INTO zaobao_feed_state VALUES(1,?) ON CONFLICT(id) DO UPDATE SET fetched_at=excluded.fetched_at",
-                (now(),),
+                "INSERT INTO zaobao_feed_state(id,fetched_at,next_page,has_more) VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET fetched_at=CASE WHEN ? THEN zaobao_feed_state.fetched_at ELSE excluded.fetched_at END,next_page=excluded.next_page,has_more=excluded.has_more",
+                (now(), next_page, int(has_more), append),
             )
+
+    def update_media(self, article: ZaobaoArticle) -> bool:
+        with self.db.conn as conn:
+            result = conn.execute(
+                "UPDATE zaobao_articles SET body=? WHERE article_id=? AND json_extract(body,'$.fetchedAt')=?",
+                (article.model_dump_json(by_alias=True), article.article_id, article.fetched_at),
+            )
+        return result.rowcount == 1
 
     def summary(self, identity: str) -> ZaobaoSummary | None:
         row = self.db.conn.execute(

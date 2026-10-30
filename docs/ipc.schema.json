@@ -21,6 +21,7 @@
         "updatedAt": { "type": ["string", "null"] },
         "timeLabel": { "type": ["string", "null"] },
         "thumbnail": { "type": ["string", "null"] },
+        "excerpt": { "type": ["string", "null"] },
         "cached": { "type": "boolean" },
         "read": { "type": "boolean" }
       }
@@ -47,7 +48,11 @@
       "required": ["items", "fetchedAt"],
       "properties": {
         "items": { "type": "array", "items": { "$ref": "#/$defs/ZaobaoSummary" } },
-        "fetchedAt": { "type": ["string", "null"] }
+        "fetchedAt": { "type": ["string", "null"] },
+        "total": { "type": "integer", "minimum": 0 },
+        "nextOffset": { "type": ["integer", "null"] },
+        "nextPage": { "type": "integer", "minimum": 2 },
+        "hasMore": { "type": "boolean" }
       }
     },
     "ZaobaoTask": {
@@ -55,7 +60,7 @@
       "required": ["jobId", "kind", "articleId", "state", "error"],
       "properties": {
         "jobId": { "type": "string" },
-        "kind": { "enum": ["feed", "article"] },
+        "kind": { "enum": ["feed", "more", "article"] },
         "articleId": { "type": ["string", "null"] },
         "state": { "enum": ["queued", "running", "succeeded", "failed", "cancelled"] },
         "error": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Error" }] }
@@ -133,7 +138,8 @@
             "article.progress",
             "issue.archived",
             "job.finished",
-            "zaobao.task.changed"
+            "zaobao.task.changed",
+            "zaobao.article.updated"
           ]
         },
         "data": { "type": "object" }
