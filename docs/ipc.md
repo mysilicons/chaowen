@@ -208,3 +208,29 @@ Flutter 应用（客户端）与 Python 引擎（服务端）之间的本地通�
 ## 7. 校验文件
 
 `docs/ipc.schema.json` 提供信封与主要结构的 JSON Schema，用于两侧的契约测试。
+
+## 8. 联合早报扩展（2026-10-30）
+
+本节为兼容新增能力，信封与协议号仍为 v1。`hello.result.features.zaobaoReaderV1=true` 表示支持；旧引擎无此字段时不调用新方法。唯一发现入口为 `https://www.zaobao.com/news/china`，文章只能来自已登记主列表，不接收任意 URL。
+
+| method | params | result |
+| --- | --- | --- |
+| `zaobao.feed.get` | `{}` | `{items:[ZaobaoSummary + {read,cached}],fetchedAt:string|null}`；只读本地 |
+| `zaobao.feed.refresh` | `{}` | `{jobId}`；后台刷新固定入口 |
+| `zaobao.article.get` | `{articleId}` | `{cached:boolean,article:ZaobaoArticle|null}`；只读本地 |
+| `zaobao.article.fetch` | `{articleId,refresh?:boolean}` | `{jobId}`；按需读取单篇及最多 32 张图片 |
+| `zaobao.task.get` | `{jobId}` | `{jobId,kind,articleId,state,error}`；kind 为 feed/article |
+| `zaobao.task.cancel` | `{jobId}` | `{ok:true}`；下一请求或读取块处中断 |
+| `zaobao.read.set` | `{articleId,read:boolean}` | `{ok:true}`；保留已读状态 |
+| `zaobao.cache.clear` | `{}` | `{bytes:number}`；清正文与图片，保留列表及已读；任务运行中拒绝清理 |
+| `zaobao.original.open` | `{articleId}` | `{ok:boolean}`；用户点击时用系统浏览器打开已登记原文 |
+
+`ZaobaoSummary` 字段：`articleId,title,url,author?,publishedAt?,updatedAt?,timeLabel?,thumbnail?`。当前频道页面只给相对时间时保留为 timeLabel，不假造发布时间。
+
+`ZaobaoArticle` 在摘要基础上增加 `blocks,access,contentState,parserVersion,fetchedAt,warnings`。块格式与现有 Block 一致；`access=public|subscriber|login_required|unknown`，`contentState=full|preview|unknown|unsupported`。full 由已核验的 `.com` 正文模板与 NewsArticle 元数据共同判定；明显受限标记优先判 preview。模板变化时不能把 JSON-LD 的摘要当作正文。
+
+事件 `zaobao.task.changed` 与 task.get 返回相同快照。state 为 `queued|running|succeeded|failed|cancelled`。主线程先返回 jobId，再提交后台任务，后台只发事件。相同目标的未完成任务合并；终态约保留 10 分钟，应用退出不保证续抓。客户端轮询 task.get 可恢复漏收的事件。
+
+新增错误码：`RATE_LIMITED`（429，保留 Retry-After 等待）、`ACCESS_DENIED`（401/403）、`NOT_FOUND`（404）、`CONTENT_TOO_LARGE`（页面／正文超限）。其余沿用已有错误。正文预算 700 KiB，不静默截断；图片走本地文件，不进入 NDJSON。任务等待不占用普通 RPC 的 30 秒调用时限。
+
+正文事务存放在 SQLite，与摘要／已读分开；图片缓存位于 `cache/zaobao/media/`。正文先提交，图片逐步补齐，因此任务运行中 article.get 可能已返回可读文字。取消图片任务也保留已经取得的正文。

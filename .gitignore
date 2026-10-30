@@ -40,3 +40,6 @@ Desktop.ini
 
 dist/
 
+# 联合早报本机结构调研样本（不分发新闻正文）
+_probe/zaobao_*.local.html
+

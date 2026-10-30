@@ -119,6 +119,10 @@ def test_error_codes_match_protocol():
         "CIRCUIT_OPEN",
         "UNKNOWN_METHOD",
         "BAD_REQUEST",
+            "RATE_LIMITED",
+            "ACCESS_DENIED",
+            "NOT_FOUND",
+            "CONTENT_TOO_LARGE",
     }
     assert {code.value for code in ErrorCode} == expected
 

@@ -141,7 +141,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.serve:
         engine = build_engine(library, cache)
-        RpcServer(engine, sys.stdin, sys.stdout).run()
+        try:
+            RpcServer(engine, sys.stdin, sys.stdout).run()
+        finally:
+            engine.zaobao.close()
         return 0
 
     if args.download:

@@ -23,8 +23,10 @@ from .core.paths import LibraryPaths, layout_url
 from .services.article_service import ArticleService
 from .services.control import Cancelled, IssueControl
 from .services.queue import DownloadService
+from .services.zaobao_service import ZaobaoService
 from .store import settings
 from .store.repo import Repo
+from .zaobao_api import ZaobaoAPI
 
 PROTOCOL_VERSION = 1
 
@@ -52,16 +54,19 @@ class Engine:
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="job")
         self._jobs: dict[str, IssueControl] = {}
         self._jobs_lock = threading.Lock()
+        self.zaobao = ZaobaoAPI(ZaobaoService(repo.db, service.paths.cache))
 
     def bind_emitter(self, emit: Any) -> None:
         # 服务层的事件必须走同一条通道，否则下载进度到不了客户端
         self._emit = emit
         self.service.emit = emit
         self.articles.emit = emit
+        self.zaobao.emit = emit
 
     @property
     def handlers(self) -> dict[str, Any]:
         return {
+            **self.zaobao.handlers,
             "hello": self.hello,
             "issue.parse": self.issue_parse,
             "issue.status": self.issue_status,
@@ -89,6 +94,7 @@ class Engine:
             "python": platform.python_version(),
             "library": str(self.service.paths.library),
             "cache": str(self.service.paths.cache),
+            "features": {"zaobaoReaderV1": True},
         }
 
     def issue_parse(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:
@@ -127,7 +133,11 @@ class Engine:
 
     def _issue_from_db(self, d: Date) -> dict[str, Any] | None:
         rows = self.repo.list_pages(d)
-        if not rows or any(not row["title"] for row in rows):
+        if (
+            not rows
+            or [row["page_no"] for row in rows] != list(range(1, len(rows) + 1))
+            or any(not row["title"] for row in rows)
+        ):
             return None
 
         base = layout_url(d).replace("node_01.html", "")

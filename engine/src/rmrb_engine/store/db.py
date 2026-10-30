@@ -6,7 +6,7 @@ import sqlite3
 import threading
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 DDL = """
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -66,10 +66,22 @@ class Database:
         return conn
 
     def _init_schema(self) -> None:
+        from .zaobao_repo import ZAOBAO_DDL
+
+        self.conn.executescript(DDL)
+        row = self.conn.execute("SELECT value FROM schema_meta WHERE key='version'").fetchone()
+        version = int(row[0]) if row else 0
+        if version > SCHEMA_VERSION:
+            raise RuntimeError("数据库版本较新，请更新朝闻后再打开")
+        if version == 1:
+            with sqlite3.connect(str(self.path) + ".v1.bak") as backup:
+                self.conn.backup(backup)
         with self.conn:
-            self.conn.executescript(DDL)
+            self.conn.execute("BEGIN IMMEDIATE")
+            for statement in ZAOBAO_DDL:
+                self.conn.execute(statement)
             self.conn.execute(
-                "INSERT OR IGNORE INTO schema_meta(key, value) VALUES('version', ?)",
+                "INSERT INTO schema_meta(key, value) VALUES('version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (str(SCHEMA_VERSION),),
             )
 

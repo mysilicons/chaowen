@@ -57,7 +57,11 @@
             "MERGE_FAILED",
             "CIRCUIT_OPEN",
             "UNKNOWN_METHOD",
-            "BAD_REQUEST"
+            "BAD_REQUEST",
+            "RATE_LIMITED",
+            "ACCESS_DENIED",
+            "NOT_FOUND",
+            "CONTENT_TOO_LARGE"
           ]
         },
         "message": { "type": "string" },
@@ -76,7 +80,8 @@
             "download.page",
             "article.progress",
             "issue.archived",
-            "job.finished"
+            "job.finished",
+            "zaobao.task.changed"
           ]
         },
         "data": { "type": "object" }
