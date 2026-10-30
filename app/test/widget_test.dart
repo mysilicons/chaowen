@@ -45,15 +45,28 @@ class FakeEngine extends EngineClient {
     }
     if (method == 'library.month') {
       return [
-        {'date': '2026-10-29', 'status': 'archived', 'bytes': 65780526, 'pageCount': 20},
+        {
+          'date': '2026-10-29',
+          'status': 'archived',
+          'bytes': 65780526,
+          'pageCount': 20,
+        },
       ];
     }
     return {};
   }
 }
 
+class FixtureDate extends SelectedDate {
+  @override
+  DateTime build() => DateTime(2026, 10, 29);
+}
+
 Widget wrap(Widget child, EngineClient engine) => ProviderScope(
-  overrides: [engineProvider.overrideWithValue(engine)],
+  overrides: [
+    engineProvider.overrideWithValue(engine),
+    selectedDateProvider.overrideWith(FixtureDate.new),
+  ],
   child: MaterialApp(home: Scaffold(body: child)),
 );
 

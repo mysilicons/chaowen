@@ -10,6 +10,7 @@ import 'views/library_view.dart';
 import 'views/onboarding_view.dart';
 import 'views/settings_view.dart';
 import 'views/reader_view.dart';
+import 'views/zaobao_view.dart';
 
 class RmrbApp extends ConsumerWidget {
   const RmrbApp({super.key, required this.engine});
@@ -189,7 +190,7 @@ class HomeShell extends ConsumerWidget {
           Expanded(
             child: IndexedStack(
               index: index,
-              children: const [LibraryView(), ReaderView(), DownloadsView(), SettingsView()],
+              children: [const LibraryView(), const ReaderView(), const DownloadsView(), const SettingsView(), ZaobaoView(active: index == 4)],
             ),
           ),
         ],
@@ -244,7 +245,7 @@ class _Sidebar extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          '人民日报电子版',
+                          '新闻阅读与本地存档',
                           style: TextStyle(
                             fontFamily: AppFonts.serif,
                             fontFamilyFallback: AppFonts.fallback,
@@ -274,6 +275,12 @@ class _Sidebar extends StatelessWidget {
             label: collapsed ? '' : '书架',
             selected: index == 0,
             onTap: () => onSelect(0),
+          ),
+          _NavItem(
+            icon: Icons.newspaper_outlined,
+            label: collapsed ? '' : '联合早报',
+            selected: index == 4,
+            onTap: () => onSelect(4),
           ),
           _NavItem(
             icon: Icons.download_outlined,

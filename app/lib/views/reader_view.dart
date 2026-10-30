@@ -8,6 +8,7 @@ import 'package:pdfrx/pdfrx.dart';
 import '../core/models.dart';
 import '../state/providers.dart';
 import '../theme/palette.dart';
+import '../widgets/article_body.dart';
 
 class ReaderView extends ConsumerStatefulWidget {
   const ReaderView({super.key});
@@ -614,87 +615,20 @@ class _TextPaneState extends ConsumerState<_TextPane> {
   }
 
   Widget _articleBody(Article article, ArticlePage data) {
-    final scale = widget.scale;
     final thumb = widget.page?.thumbUrl;
-
-    return SelectionArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(28, 26, 28, 32),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 980),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (data.kind == PageKind.imageOnly && thumb != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 22),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.network(
-                        thumb,
-                        fit: BoxFit.fitWidth,
-                        errorBuilder: (context, error, stack) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                Text(
-                  article.title,
-                  style: TextStyle(
-                    fontFamily: AppFonts.serif,
-                  fontFamilyFallback: AppFonts.fallback,
-                    fontSize: 22 * scale,
-                    fontWeight: FontWeight.w700,
-                    height: 1.5,
-                    color: context.colors.text,
-                  ),
-                ),
-                if (article.author != null && article.author!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    article.author!,
-                    style: TextStyle(fontSize: 12 * scale, color: context.colors.text2),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                for (final block in article.blocks)
-                  if (block.isImage)
-                    _image(block, scale)
-                  else if ((block.text ?? '').isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 14 * scale),
-                      child: Text(
-                        '\u3000\u3000${block.text}',
-                        style: TextStyle(
-                          fontFamily: AppFonts.serif,
-                  fontFamilyFallback: AppFonts.fallback,
-                          fontSize: 17 * scale,
-                          height: 1.9,
-                          color: context.colors.text,
-                        ),
-                      ),
-                    ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _image(Block block, double scale) {
-    final path = block.local;
-    if (path == null || !File(path).existsSync()) return const SizedBox.shrink();
-    return Padding(
-      padding: EdgeInsets.only(bottom: 16 * scale),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: Image.file(
-          File(path),
-          fit: BoxFit.fitWidth,
-          errorBuilder: (context, error, stack) => const SizedBox.shrink(),
-        ),
-      ),
+    return ArticleBody(
+      article: article,
+      scale: widget.scale,
+      leading: data.kind == PageKind.imageOnly && thumb != null
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 22),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(thumb, fit: BoxFit.fitWidth,
+                  errorBuilder: (context, error, stack) => const SizedBox.shrink()),
+              ),
+            )
+          : null,
     );
   }
 }
