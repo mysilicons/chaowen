@@ -27,6 +27,8 @@ class NewsEngine extends EngineClient {
   final calls = <String>[];
   bool fetched = false;
   Completer<Object?>? delayedArticle;
+  Completer<void>? delayedMore;
+  bool failMore = false;
 
   @override
   Future<Object?> call(
@@ -78,6 +80,8 @@ class NewsEngine extends EngineClient {
           'items': items.skip(params?['offset'] as int? ?? 0).toList(),
         };
       case 'zaobao.feed.more':
+        if (delayedMore != null) await delayedMore!.future;
+        if (failMore) throw const EngineException('HTTP_ERROR', '分页网络暂不可用');
         loadedOlder = true;
         return {'jobId': 'more-1'};
       case 'zaobao.article.get':
@@ -85,18 +89,24 @@ class NewsEngine extends EngineClient {
           return delayedArticle!.future;
         }
         final second = params?['articleId'] == '456';
+        final older = params?['articleId'] == '789';
         return {
           'cached': cached || fetched,
           'article': cached || fetched
               ? {
-                  'articleId': second ? '456' : '123',
-                  'title': second ? '另一篇新闻' : '测试中国新闻',
+                  'articleId': params?['articleId'],
+                  'title': older ? '前一天的新闻' : (second ? '另一篇新闻' : '测试中国新闻'),
                   'url': 'https://www.zaobao.com/news/china/story20261030-123',
                   'author': '测试作者',
                   'publishedAt': '2026-10-30T09:42:00+08:00',
                   'contentState': preview ? 'preview' : 'full',
                   'blocks': [
-                    {'type': 'p', 'text': second ? '另一篇独立正文。' : '这是独立提取的正文。'},
+                    {
+                      'type': 'p',
+                      'text': older
+                          ? '更早文章的正文。'
+                          : (second ? '另一篇独立正文。' : '这是独立提取的正文。'),
+                    },
                   ],
                 }
               : null,
@@ -137,6 +147,76 @@ Future<void> mount(
 }
 
 void main() {
+  testWidgets('reader directory loads older news when scrolled to the bottom', (
+    tester,
+  ) async {
+    final engine = NewsEngine(paged: true, extraItems: 24);
+    await mount(tester, engine);
+    await tester.tap(find.text('测试中国新闻'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -5000));
+    await tester.pumpAndSettle();
+    expect(engine.calls.where((m) => m == 'zaobao.feed.more').length, 1);
+    expect(find.textContaining('这是独立提取的正文'), findsOneWidget);
+    expect(find.text('第 1 / 27 篇'), findsOneWidget);
+  });
+
+  testWidgets('next at the loaded boundary fetches and opens the next page', (
+    tester,
+  ) async {
+    final engine = NewsEngine(paged: true);
+    await mount(tester, engine);
+    await tester.tap(find.text('另一篇新闻'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一篇'));
+    await tester.pumpAndSettle();
+    expect(engine.calls.where((m) => m == 'zaobao.feed.more').length, 1);
+    expect(find.text('第 3 / 3 篇'), findsOneWidget);
+    expect(find.textContaining('更早文章的正文'), findsOneWidget);
+    final next = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, '下一篇'),
+    );
+    expect(next.onPressed, isNull);
+  });
+
+  testWidgets('failed boundary load keeps current article and can retry', (
+    tester,
+  ) async {
+    final engine = NewsEngine(paged: true)..failMore = true;
+    await mount(tester, engine, size: const Size(810, 700));
+    await tester.tap(find.text('另一篇新闻'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('下一篇'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('另一篇独立正文'), findsOneWidget);
+    expect(find.textContaining('分页网络暂不可用'), findsWidgets);
+    engine.failMore = false;
+    await tester.tap(find.text('下一篇'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('更早文章的正文'), findsOneWidget);
+  });
+
+  testWidgets(
+    'page load survives changing articles and does not duplicate requests',
+    (tester) async {
+      final engine = NewsEngine(paged: true)..delayedMore = Completer<void>();
+      await mount(tester, engine);
+      await tester.tap(find.text('测试中国新闻'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('下一篇'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('下一篇'));
+      await tester.pump();
+      await tester.tap(find.text('上一篇'));
+      await tester.pump();
+      engine.delayedMore!.complete();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('这是独立提取的正文'), findsOneWidget);
+      expect(find.text('第 1 / 3 篇'), findsOneWidget);
+      expect(engine.calls.where((m) => m == 'zaobao.feed.more').length, 1);
+    },
+  );
+
   testWidgets('summaries never appear even when the feed supplies them', (
     tester,
   ) async {

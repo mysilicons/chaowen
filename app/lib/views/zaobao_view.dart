@@ -24,6 +24,7 @@ class ZaobaoView extends ConsumerStatefulWidget {
 
 class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   final _listScroll = ScrollController();
+  final _directoryScroll = ScrollController();
   final _articleScroll = ScrollController();
   List<ZaobaoItem> _items = [];
   ZaobaoItem? _selected;
@@ -38,6 +39,11 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   bool _hasMore = false;
   int? _nextOffset;
   String? _moreError;
+  int _sessionGeneration = 0;
+  Future<void>? _pendingMore;
+  bool _advancing = false;
+
+  bool get _canLoadMore => _hasMore || _nextOffset != null;
 
   ZaobaoClient get api => ZaobaoClient(ref.read(engineProvider));
 
@@ -45,6 +51,7 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   void initState() {
     super.initState();
     _listScroll.addListener(_onScroll);
+    _directoryScroll.addListener(_onDirectoryScroll);
     if (widget.active) _start();
   }
 
@@ -54,6 +61,7 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
     if (widget.active && !oldWidget.active) _start();
     if (!widget.active && oldWidget.active) {
       _generation++;
+      _invalidateSession();
       setState(() {
         _items = [];
         _article = null;
@@ -73,12 +81,24 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   @override
   void dispose() {
     _generation++;
+    _invalidateSession();
     _listScroll.dispose();
+    _directoryScroll.dispose();
     _articleScroll.dispose();
     super.dispose();
   }
 
   bool _current(int token) => mounted && widget.active && token == _generation;
+
+  bool _sessionCurrent(int token) =>
+      mounted && widget.active && token == _sessionGeneration;
+
+  void _invalidateSession() {
+    _sessionGeneration++;
+    _pendingMore = null;
+    _loadingMore = false;
+    _advancing = false;
+  }
 
   Future<void> _resetSession() async {
     try {
@@ -90,6 +110,7 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
 
   Future<void> _load() async {
     final token = ++_generation;
+    _invalidateSession();
     setState(() {
       _busy = true;
       _error = null;
@@ -148,21 +169,38 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   }
 
   void _onScroll() {
+    if (_selected == null) _loadNearEnd(_listScroll);
+  }
+
+  void _onDirectoryScroll() {
+    if (_selected != null) _loadNearEnd(_directoryScroll);
+  }
+
+  void _loadNearEnd(ScrollController controller) {
     if (widget.active &&
-        _selected == null &&
-        !_busy &&
         !_loadingMore &&
         _moreError == null &&
-        (_hasMore || _nextOffset != null) &&
-        _listScroll.hasClients &&
-        _listScroll.position.extentAfter < 280) {
+        _canLoadMore &&
+        controller.hasClients &&
+        controller.position.extentAfter < 280) {
       unawaited(_more());
     }
   }
 
-  Future<void> _more() async {
-    if (_loadingMore || _busy) return;
-    final token = _generation;
+  Future<void> _more() {
+    if (_pendingMore case final pending?) return pending;
+    if (!_canLoadMore) return Future.value();
+    final request = _loadMore(_sessionGeneration);
+    _pendingMore = request;
+    unawaited(
+      request.whenComplete(() {
+        if (identical(_pendingMore, request)) _pendingMore = null;
+      }),
+    );
+    return request;
+  }
+
+  Future<void> _loadMore(int token) async {
     setState(() {
       _loadingMore = true;
       _moreError = null;
@@ -170,18 +208,18 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
     try {
       // Reuse pages only within this active in-memory session.
       var data = await api.call('zaobao.feed.get', {'offset': _items.length});
-      if (!_current(token)) return;
+      if (!_sessionCurrent(token)) return;
       if ((data['items'] as List<dynamic>? ?? []).isEmpty &&
           data['hasMore'] == true) {
         await api.run(
           'zaobao.feed.more',
           {},
-          isCurrent: () => _current(token),
+          isCurrent: () => _sessionCurrent(token),
           onJob: (_) {},
         );
         data = await api.call('zaobao.feed.get', {'offset': _items.length});
       }
-      if (!_current(token)) return;
+      if (!_sessionCurrent(token)) return;
       final known = _items.map((item) => item.id).toSet();
       final added = (data['items'] as List<dynamic>? ?? [])
           .map((value) => ZaobaoItem.fromJson(value as Map<String, dynamic>))
@@ -192,9 +230,30 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
         _nextOffset = data['nextOffset'] as int?;
       });
     } catch (error) {
-      if (_current(token)) setState(() => _moreError = _message(error));
+      if (_sessionCurrent(token)) setState(() => _moreError = _message(error));
     } finally {
-      if (_current(token)) setState(() => _loadingMore = false);
+      if (_sessionCurrent(token)) setState(() => _loadingMore = false);
+    }
+  }
+
+  Future<void> _next() async {
+    if (_busy || _advancing) return;
+    final selected = _selected;
+    if (selected == null) return;
+    final session = _sessionGeneration;
+    final selection = _generation;
+    setState(() => _advancing = true);
+    try {
+      var index = _items.indexWhere((item) => item.id == selected.id);
+      if (index < 0) return;
+      if (index == _items.length - 1 && _canLoadMore) await _more();
+      if (!_sessionCurrent(session) || !_current(selection)) return;
+      index = _items.indexWhere((item) => item.id == selected.id);
+      if (index >= 0 && index + 1 < _items.length) {
+        await _open(_items[index + 1]);
+      }
+    } finally {
+      if (_sessionCurrent(session)) setState(() => _advancing = false);
     }
   }
 
@@ -321,6 +380,8 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
         _header(selected, scale),
         if (_busy) const LinearProgressIndicator(minHeight: 2),
         if (_error case final error?) _notice(error, error: true),
+        if (selected != null && _moreError != null)
+          _notice(_moreError!, error: true),
         if (selected != null && _article != null) ...[
           if (_article!.state == 'preview') _notice('当前为可访问的预览，请前往官网继续阅读'),
           if (_article!.state != 'preview' && _article!.state != 'full')
@@ -430,62 +491,62 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
       items: _items,
       controller: _listScroll,
       onOpen: _open,
-      footer: Column(
-        children: [
-          if (_moreError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                _moreError!,
-                style: TextStyle(fontSize: 12, color: context.colors.text2),
-              ),
-            ),
-          if (_loadingMore)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: context.colors.text2,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '正在载入更早的文章…',
-                    style: TextStyle(fontSize: 12, color: context.colors.text2),
-                  ),
-                ],
-              ),
-            )
-          else if (_hasMore || _nextOffset != null)
-            TextButton.icon(
-              onPressed: _busy ? null : _more,
-              icon: const Icon(Icons.keyboard_arrow_down, size: 16),
-              label: Text(
-                _moreError == null ? '加载更早的文章' : '重试加载',
-                style: const TextStyle(fontSize: 12),
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: context.colors.text2,
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Text(
-                '已读至当前列表末尾',
-                style: TextStyle(fontSize: 11, color: context.colors.text2),
-              ),
-            ),
-        ],
-      ),
+      footer: _paginationFooter(),
     );
   }
+
+  Widget _paginationFooter() => Column(
+    children: [
+      if (_moreError != null)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            _moreError!,
+            style: TextStyle(fontSize: 12, color: context.colors.text2),
+          ),
+        ),
+      if (_loadingMore)
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: context.colors.text2,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '正在载入更早的文章…',
+                style: TextStyle(fontSize: 12, color: context.colors.text2),
+              ),
+            ],
+          ),
+        )
+      else if (_canLoadMore)
+        TextButton.icon(
+          onPressed: _busy ? null : _more,
+          icon: const Icon(Icons.keyboard_arrow_down, size: 16),
+          label: Text(
+            _moreError == null ? '加载更早的文章' : '重试加载',
+            style: const TextStyle(fontSize: 12),
+          ),
+          style: TextButton.styleFrom(foregroundColor: context.colors.text2),
+        )
+      else
+        Padding(
+          padding: const EdgeInsets.all(14),
+          child: Text(
+            '已读至当前列表末尾',
+            style: TextStyle(fontSize: 11, color: context.colors.text2),
+          ),
+        ),
+    ],
+  );
 
   Widget _reader(double scale) {
     final index = _items.indexWhere((item) => item.id == _selected?.id);
@@ -525,12 +586,16 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
               ),
               const Spacer(),
               TextButton.icon(
-                onPressed: index >= 0 && index < _items.length - 1
-                    ? () => _open(_items[index + 1])
+                onPressed:
+                    index >= 0 &&
+                        !_busy &&
+                        !_advancing &&
+                        (index < _items.length - 1 || _canLoadMore)
+                    ? _next
                     : null,
                 icon: const Icon(Icons.chevron_right, size: 18),
                 iconAlignment: IconAlignment.end,
-                label: const Text('下一篇'),
+                label: Text(_advancing ? '正在加载…' : '下一篇'),
               ),
             ],
           ),
@@ -544,47 +609,50 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
             SizedBox(
               width: 204,
               child: ListView.builder(
-                itemCount: _items.length,
+                controller: _directoryScroll,
+                itemCount: _items.length + 1,
                 padding: const EdgeInsets.symmetric(
                   vertical: 12,
                   horizontal: 8,
                 ),
-                itemBuilder: (context, i) => InkWell(
-                  onTap: () => _open(_items[i]),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: i == index
-                          ? context.colors.brand.withValues(alpha: .08)
-                          : null,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border(
-                        left: BorderSide(
-                          width: 3,
-                          color: i == index
-                              ? context.colors.brand
-                              : Colors.transparent,
+                itemBuilder: (context, i) => i == _items.length
+                    ? _paginationFooter()
+                    : InkWell(
+                        onTap: () => _open(_items[i]),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 4),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: i == index
+                                ? context.colors.brand.withValues(alpha: .08)
+                                : null,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border(
+                              left: BorderSide(
+                                width: 3,
+                                color: i == index
+                                    ? context.colors.brand
+                                    : Colors.transparent,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            _items[i].title,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: AppFonts.serif,
+                              fontFamilyFallback: AppFonts.fallback,
+                              fontSize: 12,
+                              height: 1.6,
+                              color: i == index
+                                  ? context.colors.brand
+                                  : context.colors.text2,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    child: Text(
-                      _items[i].title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: AppFonts.serif,
-                        fontFamilyFallback: AppFonts.fallback,
-                        fontSize: 12,
-                        height: 1.6,
-                        color: i == index
-                            ? context.colors.brand
-                            : context.colors.text2,
-                      ),
-                    ),
-                  ),
-                ),
               ),
             ),
             VerticalDivider(width: 1, color: context.colors.border),
