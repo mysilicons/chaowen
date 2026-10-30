@@ -8,6 +8,9 @@ class ZaobaoItem {
     this.timeLabel,
     this.read = false,
     this.cached = false,
+    this.thumbnail,
+    this.excerpt,
+    this.publishedAt,
   });
 
   final String id;
@@ -16,6 +19,21 @@ class ZaobaoItem {
   final String? timeLabel;
   final bool read;
   final bool cached;
+  final String? thumbnail;
+  final String? excerpt;
+  final String? publishedAt;
+
+  ZaobaoItem markRead() => ZaobaoItem(
+    id: id,
+    title: title,
+    url: url,
+    timeLabel: timeLabel,
+    thumbnail: thumbnail,
+    excerpt: excerpt,
+    publishedAt: publishedAt,
+    read: true,
+    cached: true,
+  );
 
   factory ZaobaoItem.fromJson(Map<String, dynamic> json) => ZaobaoItem(
     id: json['articleId'] as String,
@@ -24,6 +42,9 @@ class ZaobaoItem {
     timeLabel: json['timeLabel'] as String?,
     read: json['read'] == true,
     cached: json['cached'] == true,
+    thumbnail: json['thumbnail'] as String?,
+    excerpt: json['excerpt'] as String?,
+    publishedAt: json['publishedAt'] as String?,
   );
 }
 

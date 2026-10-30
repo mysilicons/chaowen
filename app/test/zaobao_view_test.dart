@@ -5,18 +5,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rmrb_reader/core/engine_client.dart';
 import 'package:rmrb_reader/core/models.dart';
+import 'package:rmrb_reader/core/zaobao_client.dart';
 import 'package:rmrb_reader/state/providers.dart';
 import 'package:rmrb_reader/views/zaobao_view.dart';
+import 'package:rmrb_reader/theme/palette.dart';
 
 class NewsEngine extends EngineClient {
   NewsEngine({
     this.cached = true,
     this.preview = false,
     this.failRefresh = false,
+    this.paged = false,
+    this.extraItems = 0,
   });
   final bool cached;
   final bool preview;
   final bool failRefresh;
+  final bool paged;
+  final int extraItems;
+  bool loadedOlder = false;
   final calls = <String>[];
   bool fetched = false;
   Completer<Object?>? delayedArticle;
@@ -34,22 +41,44 @@ class NewsEngine extends EngineClient {
           'features': {'zaobaoReaderV1': true},
         };
       case 'zaobao.feed.get':
+        final items = <Map<String, dynamic>>[
+          {
+            'articleId': '123',
+            'title': '测试中国新闻',
+            'url': 'https://www.zaobao.com/news/china/story20261030-123',
+            'read': false,
+          },
+          {
+            'articleId': '456',
+            'title': '另一篇新闻',
+            'url': 'https://www.zaobao.com/news/china/story20261030-456',
+          },
+          if (loadedOlder)
+            {
+              'articleId': '789',
+              'title': '前一天的新闻',
+              'url': 'https://www.zaobao.com/news/china/story20261029-789',
+            },
+        ];
+        items.insertAll(2, [
+          for (var i = 0; i < extraItems; i++)
+            {
+              'articleId': '${1000 + i}',
+              'title': '第${i + 3}篇中国新闻，测试连续滚动排版',
+              'url':
+                  'https://www.zaobao.com/news/china/story20261030-${1000 + i}',
+            },
+        ]);
         return {
           'fetchedAt': '2026-10-30T02:00:00+00:00',
-          'items': [
-            {
-              'articleId': '123',
-              'title': '测试中国新闻',
-              'url': 'https://www.zaobao.com/news/china/story20261030-123',
-              'read': false,
-            },
-            {
-              'articleId': '456',
-              'title': '另一篇新闻',
-              'url': 'https://www.zaobao.com/news/china/story20261030-456',
-            },
-          ],
+          'hasMore': paged && !loadedOlder,
+          'total': items.length,
+          'nextOffset': null,
+          'items': items.skip(params?['offset'] as int? ?? 0).toList(),
         };
+      case 'zaobao.feed.more':
+        loadedOlder = true;
+        return {'jobId': 'more-1'};
       case 'zaobao.article.get':
         if (params?['articleId'] == '123' && delayedArticle != null) {
           return delayedArticle!.future;
@@ -85,20 +114,94 @@ class NewsEngine extends EngineClient {
   }
 }
 
-Future<void> mount(WidgetTester tester, NewsEngine engine) async {
-  tester.view.physicalSize = const Size(1280, 900);
+Future<void> mount(
+  WidgetTester tester,
+  NewsEngine engine, {
+  Size size = const Size(1280, 900),
+  Brightness brightness = Brightness.light,
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [engineProvider.overrideWithValue(engine)],
-      child: const MaterialApp(home: Scaffold(body: ZaobaoView())),
+      child: MaterialApp(
+        theme: buildTheme(brightness),
+        home: const Scaffold(body: ZaobaoView()),
+      ),
     ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
+  testWidgets(
+    'dark narrow layout and reading use shared typography without overflow',
+    (tester) async {
+      await mount(
+        tester,
+        NewsEngine(),
+        size: const Size(810, 700),
+        brightness: Brightness.dark,
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(Card), findsNothing);
+      await tester.tap(find.text('测试中国新闻'));
+      await tester.pumpAndSettle();
+      expect(find.text('A-'), findsOneWidget);
+      expect(find.text('A+'), findsOneWidget);
+      expect(find.textContaining('这是独立提取的正文'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'scrolling near the bottom automatically appends an older page once',
+    (tester) async {
+      final engine = NewsEngine(paged: true, extraItems: 24);
+      await mount(tester, engine);
+      await tester.drag(
+        find.byType(CustomScrollView).first,
+        const Offset(0, -5000),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        engine.calls.where((method) => method == 'zaobao.feed.more').length,
+        1,
+      );
+      expect(engine.loadedOlder, isTrue);
+    },
+  );
+  test(
+    'completed task returns immediately without waiting for media',
+    () async {
+      final engine = NewsEngine();
+      await ZaobaoClient(engine)
+          .run(
+            'zaobao.article.fetch',
+            {'articleId': '123'},
+            isCurrent: () => true,
+            onJob: (_) {},
+          )
+          .timeout(const Duration(seconds: 2));
+      expect(engine.calls.last, 'zaobao.task.get');
+    },
+  );
+  testWidgets(
+    'newspaper layout loads older entries without replacing current news',
+    (tester) async {
+      final engine = NewsEngine(paged: true);
+      await mount(tester, engine);
+      expect(find.byType(Card), findsNothing);
+      expect(find.byType(ListTile), findsNothing);
+      await tester.tap(find.text('加载更早的文章'));
+      await tester.pumpAndSettle();
+      expect(find.text('测试中国新闻'), findsOneWidget);
+      expect(find.text('前一天的新闻'), findsOneWidget);
+      expect(engine.calls.where((m) => m == 'zaobao.feed.more').length, 1);
+    },
+  );
+
   testWidgets('does not fetch while source is inactive', (tester) async {
     final engine = NewsEngine();
     await tester.pumpWidget(

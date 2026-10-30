@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'engine_client.dart';
 import 'models.dart';
 import 'zaobao_models.dart';
@@ -30,29 +32,47 @@ class ZaobaoClient {
     Map<String, dynamic> params, {
     required bool Function() isCurrent,
     required void Function(String) onJob,
-    Future<void> Function()? onProgress,
   }) async {
-    final started = await call(method, params);
-    final job = started['jobId'] as String;
-    if (isCurrent()) onJob(job);
-    final deadline = DateTime.now().add(const Duration(minutes: 10));
-    while (isCurrent() && DateTime.now().isBefore(deadline)) {
-      final task = await call('zaobao.task.get', {'jobId': job});
-      if (task['state'] == 'succeeded') return;
-      if (task['state'] == 'failed') {
-        final error = task['error'] as Map<String, dynamic>? ?? {};
-        throw EngineException(
-          error['code'] as String? ?? 'HTTP_ERROR',
-          error['message'] as String? ?? '早报任务失败',
-        );
+    String? job;
+    Completer<void>? wake;
+    final subscription = engine.events.listen((event) {
+      if (event.name == 'zaobao.task.changed' &&
+          event.data['jobId'] == job &&
+          wake != null &&
+          !wake.isCompleted) {
+        wake.complete();
       }
-      if (task['state'] == 'cancelled') {
-        throw const EngineException('CANCELLED', '早报任务已取消');
+    });
+    try {
+      final started = await call(method, params);
+      job = started['jobId'] as String;
+      if (isCurrent()) onJob(job);
+      final deadline = DateTime.now().add(const Duration(minutes: 5));
+      while (isCurrent() && DateTime.now().isBefore(deadline)) {
+        wake = Completer<void>();
+        final task = await call('zaobao.task.get', {'jobId': job});
+        if (task['state'] == 'succeeded') return;
+        if (task['state'] == 'failed') {
+          final error = task['error'] as Map<String, dynamic>? ?? {};
+          throw EngineException(
+            error['code'] as String? ?? 'HTTP_ERROR',
+            error['message'] as String? ?? '早报任务失败',
+          );
+        }
+        if (task['state'] == 'cancelled') {
+          throw const EngineException('CANCELLED', '早报任务已取消');
+        }
+        // Events wake immediately; polling only repairs a lost event or old engine.
+        await Future.any([
+          wake.future,
+          Future<void>.delayed(const Duration(seconds: 2)),
+        ]);
       }
-      await onProgress?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await call('zaobao.task.cancel', {'jobId': job});
+      if (isCurrent()) throw const EngineException('TIMEOUT', '早报任务等待超时，已取消');
+    } finally {
+      // Detach immediately; stream cleanup must not gate an already completed task.
+      unawaited(subscription.cancel());
     }
-    await call('zaobao.task.cancel', {'jobId': job});
-    if (isCurrent()) throw const EngineException('TIMEOUT', '早报任务等待超时，已取消');
   }
 }

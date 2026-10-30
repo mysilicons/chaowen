@@ -9,6 +9,7 @@ import '../core/models.dart';
 import '../state/providers.dart';
 import '../theme/palette.dart';
 import '../widgets/article_body.dart';
+import '../widgets/reader_controls.dart';
 
 class ReaderView extends ConsumerStatefulWidget {
   const ReaderView({super.key});
@@ -266,51 +267,13 @@ class _ReaderBar extends ConsumerWidget {
           const Spacer(),
           // 字号控件在左、模式切换固定在最右：
           // 切到 PDF 时字号控件隐藏，模式开关不会跟着跳。
-          SizedBox(
-            width: 132,
-            child: mode == 'text'
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _ScaleButton(
-                        label: 'A-',
-                        onTap: () => ref.read(readerScaleProvider.notifier).step(-0.1),
-                      ),
-                      _ScaleButton(
-                        label: 'A+',
-                        onTap: () => ref.read(readerScaleProvider.notifier).step(0.1),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${(scale * 100).round()}%',
-                        style: TextStyle(fontSize: 11, color: context.colors.text2),
-                      ),
-                    ],
-                  )
-                : const SizedBox.shrink(),
-          ),
+          if (mode == 'text')
+            ReaderFontControls(scale: scale)
+          else
+            const SizedBox(width: 132),
           const SizedBox(width: 14),
           _ModeSwitch(mode: mode, onChanged: onMode),
         ],
-      ),
-    );
-  }
-}
-
-class _ScaleButton extends StatelessWidget {
-  const _ScaleButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Text(label, style: TextStyle(fontSize: 12, color: context.colors.text2)),
       ),
     );
   }

@@ -9,6 +9,8 @@ import '../core/zaobao_models.dart';
 import '../state/providers.dart';
 import '../theme/palette.dart';
 import '../widgets/article_body.dart';
+import '../widgets/reader_controls.dart';
+import '../widgets/zaobao_feed.dart';
 
 /// Kept alive in the shell; it makes no requests until the user selects this source.
 class ZaobaoView extends ConsumerStatefulWidget {
@@ -32,12 +34,24 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   bool _started = false;
   bool _supported = true;
   int _generation = 0;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  int? _nextOffset;
+  String? _moreError;
+  StreamSubscription<EngineEvent>? _updates;
 
   ZaobaoClient get api => ZaobaoClient(ref.read(engineProvider));
 
   @override
   void initState() {
     super.initState();
+    _listScroll.addListener(_onScroll);
+    _updates = ref.read(engineProvider).events.listen((event) {
+      if (event.name == 'zaobao.article.updated' &&
+          event.data['articleId'] == _selected?.id) {
+        unawaited(_readArticle(_selected!.id, _generation));
+      }
+    });
     if (widget.active) _start();
   }
 
@@ -55,6 +69,7 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   @override
   void dispose() {
     _generation++;
+    unawaited(_updates?.cancel());
     _listScroll.dispose();
     _articleScroll.dispose();
     super.dispose();
@@ -107,7 +122,59 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
     setState(() {
       _items = items;
       _fetchedAt = data['fetchedAt'] as String?;
+      _hasMore = data['hasMore'] == true;
+      _nextOffset = data['nextOffset'] as int?;
+      _moreError = null;
     });
+  }
+
+  void _onScroll() {
+    if (widget.active &&
+        _selected == null &&
+        !_busy &&
+        !_loadingMore &&
+        _moreError == null &&
+        (_hasMore || _nextOffset != null) &&
+        _listScroll.hasClients &&
+        _listScroll.position.extentAfter < 280) {
+      unawaited(_more());
+    }
+  }
+
+  Future<void> _more() async {
+    if (_loadingMore || _busy) return;
+    setState(() {
+      _loadingMore = true;
+      _moreError = null;
+    });
+    try {
+      // Read already downloaded pages first; navigating back never skips a page.
+      var data = await api.call('zaobao.feed.get', {'offset': _items.length});
+      if ((data['items'] as List<dynamic>? ?? []).isEmpty &&
+          data['hasMore'] == true) {
+        await api.run(
+          'zaobao.feed.more',
+          {},
+          isCurrent: () => mounted,
+          onJob: (_) {},
+        );
+        data = await api.call('zaobao.feed.get', {'offset': _items.length});
+      }
+      if (!mounted) return;
+      final known = _items.map((item) => item.id).toSet();
+      final added = (data['items'] as List<dynamic>? ?? [])
+          .map((value) => ZaobaoItem.fromJson(value as Map<String, dynamic>))
+          .where((item) => known.add(item.id));
+      setState(() {
+        _items = [..._items, ...added];
+        _hasMore = data['hasMore'] == true;
+        _nextOffset = data['nextOffset'] as int?;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _moreError = _message(error));
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
   }
 
   Future<void> _open(ZaobaoItem item, {bool refresh = false}) async {
@@ -134,13 +201,18 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
           {'articleId': item.id, 'refresh': refresh},
           isCurrent: () => _current(token),
           onJob: (job) => setState(() => _job = job),
-          onProgress: () => _readArticle(item.id, token),
         );
         await _readArticle(item.id, token);
       }
       if (_current(token) && _article != null) {
         await api.call('zaobao.read.set', {'articleId': item.id, 'read': true});
-        await _readFeed(token);
+        if (_current(token)) {
+          setState(
+            () => _items = _items
+                .map((entry) => entry.id == item.id ? entry.markRead() : entry)
+                .toList(),
+          );
+        }
       }
     } catch (error) {
       if (_current(token)) setState(() => _error = _message(error));
@@ -155,8 +227,14 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   }
 
   Future<void> _readArticle(String id, int token) async {
-    final article = await api.article(id);
-    if (_current(token) && article != null) setState(() => _article = article);
+    try {
+      final article = await api.article(id);
+      if (_current(token) && article != null) {
+        setState(() => _article = article);
+      }
+    } catch (error) {
+      if (_current(token)) setState(() => _error = _message(error));
+    }
   }
 
   Future<void> _back() async {
@@ -175,11 +253,6 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
       } catch (error) {
         if (mounted) setState(() => _error = _message(error));
       }
-    }
-    try {
-      if (mounted) await _readFeed(_generation);
-    } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
     }
   }
 
@@ -254,20 +327,7 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
         Expanded(
           child: IndexedStack(
             index: selected == null ? 0 : 1,
-            children: [
-              _list(),
-              _article != null
-                  ? ArticleBody(
-                      key: ValueKey(selected?.id),
-                      article: _article!.article,
-                      scale: scale,
-                      controller: _articleScroll,
-                      missingImagePlaceholder: true,
-                      metadata:
-                          '来源：联合早报${_article!.publishedAt == null ? '' : ' · ${_displayTime(_article!.publishedAt)}'}',
-                    )
-                  : _empty(_busy ? '正在提取文章正文…' : '正文暂不可用，请重试或查看原文'),
-            ],
+            children: [_list(), _reader(scale)],
           ),
         ),
       ],
@@ -275,134 +335,264 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   }
 
   Widget _header(ZaobaoItem? selected, double scale) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    height: 58,
+    padding: const EdgeInsets.symmetric(horizontal: 14),
     decoration: BoxDecoration(
       border: Border(bottom: BorderSide(color: context.colors.border)),
     ),
     child: Row(
       children: [
-        if (selected != null)
+        if (selected != null) ...[
           IconButton(
             onPressed: _back,
             tooltip: '返回文章列表',
-            icon: const Icon(Icons.arrow_back),
+            icon: const Icon(Icons.arrow_back_ios_new, size: 16),
+            color: context.colors.text2,
           ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                selected == null ? '联合早报' : '联合早报 · 中国',
-                style: TextStyle(
-                  fontFamily: AppFonts.serif,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: context.colors.text,
-                ),
-              ),
-              Text(
-                selected == null
-                    ? '中国频道'
-                    : (_busy ? '正在获取文章及图片，可先阅读文字' : '文章阅读'),
-                style: TextStyle(color: context.colors.text2, fontSize: 12),
-              ),
-            ],
+          const SizedBox(width: 4),
+        ] else
+          const SizedBox(width: 10),
+        Text(
+          '联合早报',
+          style: TextStyle(
+            fontFamily: AppFonts.serif,
+            fontFamilyFallback: AppFonts.fallback,
+            fontSize: selected == null ? 20 : 16,
+            fontWeight: FontWeight.w700,
+            color: context.colors.text,
           ),
         ),
-        if (_busy && _job != null)
-          TextButton(onPressed: _cancel, child: const Text('取消任务')),
+        const SizedBox(width: 12),
+        if (selected != null)
+          Text(
+            '中国 · 文章阅读',
+            style: TextStyle(fontSize: 12, color: context.colors.text2),
+          ),
+        const Spacer(),
+        if (_busy)
+          ReaderTextAction(
+            label: '取消',
+            onPressed: _job == null ? null : _cancel,
+          ),
         if (selected != null) ...[
-          IconButton(
-            tooltip: '缩小字号',
-            onPressed: scale > .85
-                ? () => ref.read(readerScaleProvider.notifier).step(-.05)
-                : null,
-            icon: const Icon(Icons.text_decrease),
-          ),
-          IconButton(
-            tooltip: '放大字号',
-            onPressed: scale < 1.5
-                ? () => ref.read(readerScaleProvider.notifier).step(.05)
-                : null,
-            icon: const Icon(Icons.text_increase),
-          ),
-          TextButton.icon(
+          ReaderFontControls(scale: scale),
+          const SizedBox(width: 14),
+          ReaderTextAction(
+            label: '原文',
+            icon: Icons.open_in_new,
             onPressed: _original,
-            icon: const Icon(Icons.open_in_new, size: 16),
-            label: const Text('原文'),
+          ),
+        ] else ...[
+          if (_fetchedAt != null)
+            Text(
+              '更新于 ${_displayTime(_fetchedAt)}',
+              style: TextStyle(fontSize: 11, color: context.colors.text2),
+            ),
+          const SizedBox(width: 12),
+          ReaderTextAction(
+            label: '刷新',
+            tooltip: '刷新文章列表',
+            icon: Icons.refresh,
+            onPressed: _busy || _loadingMore || !_supported
+                ? null
+                : () => _load(refresh: true),
           ),
         ],
-        IconButton(
-          tooltip: selected == null ? '刷新文章列表' : '重新提取文章',
-          onPressed: _busy || !_supported
-              ? null
-              : () => selected == null
-                    ? _load(refresh: true)
-                    : _open(selected, refresh: true),
-          icon: const Icon(Icons.refresh),
+        PopupMenuButton<String>(
+          tooltip: '更多操作',
+          iconSize: 17,
+          icon: Icon(Icons.more_horiz, color: context.colors.text2, size: 18),
+          onSelected: (action) {
+            if (action == 'clear') unawaited(_clear());
+            if (action == 'refresh' && selected != null) {
+              unawaited(_open(selected, refresh: true));
+            }
+          },
+          itemBuilder: (_) => [
+            if (selected != null)
+              PopupMenuItem(
+                value: 'refresh',
+                enabled: !_busy,
+                child: const Text('重新提取文章', style: TextStyle(fontSize: 12)),
+              ),
+            PopupMenuItem(
+              value: 'clear',
+              enabled: !_busy && !_loadingMore && _supported,
+              child: const Text('清理早报缓存', style: TextStyle(fontSize: 12)),
+            ),
+          ],
         ),
-        if (selected == null)
-          IconButton(
-            tooltip: '清理早报缓存',
-            onPressed: _busy || !_supported ? null : _clear,
-            icon: const Icon(Icons.cleaning_services_outlined),
-          ),
       ],
     ),
   );
 
   Widget _list() {
     if (_items.isEmpty) return _empty(_busy ? '正在读取中国频道…' : '暂无文章，点击刷新重试');
-    return ListView.builder(
+    return ZaobaoFeed(
+      items: _items,
       controller: _listScroll,
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
-      itemCount: _items.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              '本页 ${_items.length} 篇 · 最近更新 ${_displayTime(_fetchedAt)}',
-              style: TextStyle(fontSize: 12, color: context.colors.text2),
-            ),
-          );
-        }
-        final item = _items[index - 1];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          elevation: 0,
-          color: context.colors.surface,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 12,
-            ),
-            leading: Icon(
-              item.read ? Icons.check_circle_outline : Icons.article_outlined,
-              color: item.read ? context.colors.text2 : context.colors.brand,
-            ),
-            title: Text(
-              item.title,
-              style: TextStyle(
-                fontFamily: AppFonts.serif,
-                fontFamilyFallback: AppFonts.fallback,
-                fontSize: 18,
-                height: 1.6,
-                color: item.read ? context.colors.text2 : context.colors.text,
+      onOpen: _open,
+      footer: Column(
+        children: [
+          if (_moreError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _moreError!,
+                style: TextStyle(fontSize: 12, color: context.colors.text2),
               ),
             ),
-            subtitle: Text(
-              [
-                if (item.timeLabel != null) item.timeLabel!,
-                if (item.read) '已读',
-                if (item.cached) '已缓存正文',
-              ].join(' · '),
+          if (_loadingMore)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: context.colors.text2,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '正在载入更早的文章…',
+                    style: TextStyle(fontSize: 12, color: context.colors.text2),
+                  ),
+                ],
+              ),
+            )
+          else if (_hasMore || _nextOffset != null)
+            TextButton.icon(
+              onPressed: _busy ? null : _more,
+              icon: const Icon(Icons.keyboard_arrow_down, size: 16),
+              label: Text(
+                _moreError == null ? '加载更早的文章' : '重试加载',
+                style: const TextStyle(fontSize: 12),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: context.colors.text2,
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Text(
+                '已读至当前列表末尾',
+                style: TextStyle(fontSize: 11, color: context.colors.text2),
+              ),
             ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _open(item),
+        ],
+      ),
+    );
+  }
+
+  Widget _reader(double scale) {
+    final index = _items.indexWhere((item) => item.id == _selected?.id);
+    final body = Column(
+      children: [
+        Expanded(
+          child: _article != null
+              ? ArticleBody(
+                  key: ValueKey(_selected?.id),
+                  article: _article!.article,
+                  scale: scale,
+                  controller: _articleScroll,
+                  missingImagePlaceholder: true,
+                  metadata:
+                      '来源：联合早报${_article!.publishedAt == null ? '' : ' · ${_displayTime(_article!.publishedAt)}'}',
+                )
+              : _empty(_busy ? '正在提取文章正文…' : '正文暂不可用，请重试或查看原文'),
+        ),
+        Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: context.colors.border)),
           ),
-        );
-      },
+          child: Row(
+            children: [
+              TextButton.icon(
+                onPressed: index > 0 ? () => _open(_items[index - 1]) : null,
+                icon: const Icon(Icons.chevron_left, size: 18),
+                label: const Text('上一篇'),
+              ),
+              const Spacer(),
+              Text(
+                '第 ${index + 1} / ${_items.length} 篇',
+                style: TextStyle(fontSize: 12, color: context.colors.text2),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: index >= 0 && index < _items.length - 1
+                    ? () => _open(_items[index + 1])
+                    : null,
+                icon: const Icon(Icons.chevron_right, size: 18),
+                iconAlignment: IconAlignment.end,
+                label: const Text('下一篇'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, bounds) => Row(
+        children: [
+          if (bounds.maxWidth >= 1050) ...[
+            SizedBox(
+              width: 204,
+              child: ListView.builder(
+                itemCount: _items.length,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 8,
+                ),
+                itemBuilder: (context, i) => InkWell(
+                  onTap: () => _open(_items[i]),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: i == index
+                          ? context.colors.brand.withValues(alpha: .08)
+                          : null,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border(
+                        left: BorderSide(
+                          width: 3,
+                          color: i == index
+                              ? context.colors.brand
+                              : Colors.transparent,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      _items[i].title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppFonts.serif,
+                        fontFamilyFallback: AppFonts.fallback,
+                        fontSize: 12,
+                        height: 1.6,
+                        color: i == index
+                            ? context.colors.brand
+                            : context.colors.text2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            VerticalDivider(width: 1, color: context.colors.border),
+          ],
+          Expanded(child: body),
+        ],
+      ),
     );
   }
 
