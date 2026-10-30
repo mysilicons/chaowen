@@ -78,3 +78,28 @@ def test_cancel_and_failure_have_queryable_terminal_state(tmp_path):
     last = json.loads(out.getvalue().splitlines()[-1])
     assert last["ok"] is False and last["error"]["code"] == "BAD_REQUEST"
     engine.zaobao.close()
+
+
+def test_cancelled_inflight_target_can_be_queued_again(tmp_path):
+    engine, server, out = make_server(tmp_path)
+    started = threading.Event()
+    release = threading.Event()
+
+    def refresh(cancel):
+        started.set()
+        release.wait(2)
+        from rmrb_engine.net.zaobao import check_cancel
+
+        check_cancel(cancel)
+
+    engine.zaobao.service.refresh_feed = refresh
+    call(server, "zaobao.feed.refresh")
+    first = json.loads(out.getvalue().splitlines()[0])["result"]["jobId"]
+    assert started.wait(1)
+    call(server, "zaobao.task.cancel", {"jobId": first}, 2)
+    call(server, "zaobao.feed.refresh", identity=3)
+    messages = [json.loads(line) for line in out.getvalue().splitlines()]
+    second = next(m for m in messages if m.get("id") == 3)["result"]["jobId"]
+    assert second != first
+    release.set()
+    engine.zaobao.close()

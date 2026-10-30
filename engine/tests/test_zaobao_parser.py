@@ -73,3 +73,15 @@ def test_explicit_paywall_is_preview_even_with_many_paragraphs():
 def test_unknown_template_never_reports_full():
     with pytest.raises(EngineError):
         parse_article("<h1>Just a moment</h1><p>Verify you are human</p>", URL)
+
+
+def test_missing_metadata_is_unknown_and_missing_body_text_is_error():
+    import re
+
+    without_metadata = re.sub(r'<script type="application/ld\+json">.*?</script>', "", ARTICLE)
+    assert parse_article(without_metadata, URL).content_state == "unknown"
+    with pytest.raises(EngineError):
+        parse_article(
+            '<h1 class="article-title">标题</h1><article id="article-body" data-testid="article-body"><img src="https://dss0.zbstatic5.com/image/zaobao/test"></article>',
+            URL,
+        )

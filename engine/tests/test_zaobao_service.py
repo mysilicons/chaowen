@@ -135,3 +135,86 @@ def test_403_does_not_retry_and_size_limit_is_enforced():
     )
     with pytest.raises(EngineError):
         http.request(URL, threading.Event(), max_bytes=20)
+
+
+def test_cancel_while_loading_images_preserves_readable_text(tmp_path):
+    from rmrb_engine.services.control import Cancelled
+
+    cancel = threading.Event()
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        if str(request.url) == FEED_URL:
+            return httpx.Response(200, text=FEED, headers={"content-type": "text/html"})
+        if str(request.url) == URL:
+            return httpx.Response(200, text=ARTICLE, headers={"content-type": "text/html"})
+        cancel.set()
+        return httpx.Response(
+            200, content=b"\x89PNG\r\n\x1a\n", headers={"content-type": "image/png"}
+        )
+
+    service = make_service(tmp_path, handler)
+    service.refresh_feed(cancel)
+    with pytest.raises(Cancelled):
+        service.fetch_article("1234567", cancel)
+    assert service.article("1234567")["article"]["blocks"][1]["text"] == "第一段加粗。"
+    assert len(seen) == 3  # feed, selected article, its first image; never related articles
+    service.close()
+
+
+def test_rate_limit_keeps_full_retry_after_without_retry():
+    import time
+
+    http = ZaobaoHttp(
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(429, headers={"retry-after": "300"})
+            )
+        ),
+        interval=0,
+    )
+    before = time.monotonic()
+    with pytest.raises(EngineError) as exc:
+        http.text(FEED_URL, threading.Event())
+    assert exc.value.code.value == "RATE_LIMITED"
+    assert http._next_request >= before + 300
+    http.close()
+
+
+def test_network_can_be_cancelled_before_any_request():
+    seen = []
+    http = ZaobaoHttp(
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: seen.append(request) or httpx.Response(200)
+            )
+        ),
+        interval=0,
+    )
+    cancel = threading.Event()
+    cancel.set()
+    from rmrb_engine.services.control import Cancelled
+
+    with pytest.raises(Cancelled):
+        http.text(FEED_URL, cancel)
+    assert not seen
+    http.close()
+
+
+def test_corrupt_body_is_evicted_and_can_be_fetched_again(tmp_path):
+    service = make_service(
+        tmp_path,
+        lambda r: httpx.Response(
+            200,
+            text=FEED if str(r.url) == FEED_URL else ARTICLE,
+            headers={"content-type": "text/html"},
+        ),
+    )
+    service.refresh_feed(threading.Event())
+    with service.db.conn as conn:
+        conn.execute("UPDATE zaobao_articles SET body='broken'")
+    assert service.article("1234567")["cached"] is False
+    service.fetch_article("1234567", threading.Event())
+    assert service.article("1234567")["cached"] is True
+    service.close()

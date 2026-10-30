@@ -9,6 +9,58 @@
     { "$ref": "#/$defs/Event" }
   ],
   "$defs": {
+    "ZaobaoSummary": {
+      "type": "object",
+      "required": ["articleId", "title", "url"],
+      "properties": {
+        "articleId": { "type": "string", "pattern": "^[0-9]{1,20}$" },
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "pattern": "^https://www\\.zaobao\\.com/news/china/story[0-9]{8}-[0-9]+$" },
+        "author": { "type": ["string", "null"] },
+        "publishedAt": { "type": ["string", "null"] },
+        "updatedAt": { "type": ["string", "null"] },
+        "timeLabel": { "type": ["string", "null"] },
+        "thumbnail": { "type": ["string", "null"] },
+        "cached": { "type": "boolean" },
+        "read": { "type": "boolean" }
+      }
+    },
+    "ZaobaoArticle": {
+      "allOf": [
+        { "$ref": "#/$defs/ZaobaoSummary" },
+        { "$ref": "#/$defs/Article" },
+        {
+          "type": "object",
+          "required": ["access", "contentState", "parserVersion", "warnings"],
+          "properties": {
+            "access": { "enum": ["public", "subscriber", "login_required", "unknown"] },
+            "contentState": { "enum": ["full", "preview", "unknown", "unsupported"] },
+            "parserVersion": { "type": "string" },
+            "fetchedAt": { "type": ["string", "null"] },
+            "warnings": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "ZaobaoFeed": {
+      "type": "object",
+      "required": ["items", "fetchedAt"],
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/ZaobaoSummary" } },
+        "fetchedAt": { "type": ["string", "null"] }
+      }
+    },
+    "ZaobaoTask": {
+      "type": "object",
+      "required": ["jobId", "kind", "articleId", "state", "error"],
+      "properties": {
+        "jobId": { "type": "string" },
+        "kind": { "enum": ["feed", "article"] },
+        "articleId": { "type": ["string", "null"] },
+        "state": { "enum": ["queued", "running", "succeeded", "failed", "cancelled"] },
+        "error": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Error" }] }
+      }
+    },
     "Request": {
       "type": "object",
       "required": ["id", "method"],
@@ -127,8 +179,8 @@
       "required": ["type"],
       "properties": {
         "type": { "type": "string", "enum": ["p", "img"] },
-        "text": { "type": "string" },
-        "src": { "type": "string" },
+        "text": { "type": ["string", "null"] },
+        "src": { "type": ["string", "null"] },
         "local": { "type": ["string", "null"] },
         "caption": { "type": ["string", "null"] }
       }

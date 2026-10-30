@@ -55,7 +55,7 @@ def parse_feed(html: str) -> list[ZaobaoSummary]:
 def _feed_card(card: LexborNode) -> ZaobaoSummary | None:
     for link in card.css("a[href]"):
         try:
-            url, identity = article_url(link.attributes["href"])
+            url, identity = article_url(link.attributes.get("href") or "")
         except (EngineError, ValueError):
             continue
         title = link.attributes.get("title") or _text(link)
@@ -67,7 +67,7 @@ def _feed_card(card: LexborNode) -> ZaobaoSummary | None:
             title=title.strip(),
             url=url,
             time_label=_text(card.css_first("time, span")),
-            thumbnail=media_url(image.attributes.get("src", "")) if image else None,
+            thumbnail=media_url(image.attributes.get("src") or "") if image else None,
         )
     return None
 
@@ -103,7 +103,7 @@ def _author(tree: LexborHTMLParser, meta: dict) -> str | None:
 
 
 def _image(node: LexborNode, caption: str | None = None) -> Block | None:
-    raw = node.attributes.get("data-src") or node.attributes.get("src", "")
+    raw = node.attributes.get("data-src") or node.attributes.get("src") or ""
     url = media_url(raw)
     return Block.image(url, caption or node.attributes.get("alt") or None) if url else None
 

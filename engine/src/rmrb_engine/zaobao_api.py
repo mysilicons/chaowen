@@ -41,8 +41,7 @@ class ZaobaoAPI:
         }
 
     def fetch(self, params: dict, ctx: Any) -> None:
-        identity = params.get("articleId")
-        self.service._summary(identity)
+        identity = self.service.summary(params.get("articleId")).article_id
         refresh = params.get("refresh", False)
         if not isinstance(refresh, bool):
             raise EngineError(ErrorCode.BAD_REQUEST, "refresh 必须是布尔值")
@@ -58,6 +57,7 @@ class ZaobaoAPI:
                     if t["kind"] == kind
                     and t["articleId"] == identity
                     and t["state"] not in TERMINAL
+                    and not self._cancel[t["jobId"]].is_set()
                 ),
                 None,
             )
@@ -115,15 +115,14 @@ class ZaobaoAPI:
     def _snapshot(self, job: str) -> dict:
         return copy.deepcopy({k: v for k, v in self._tasks[job].items() if k != "updated"})
 
-    def task(self, job: str) -> dict:
+    def task(self, job: object) -> dict:
         with self._lock:
             if not isinstance(job, str) or job not in self._tasks:
                 raise EngineError(ErrorCode.BAD_REQUEST, "早报任务不存在或已过期")
             return self._snapshot(job)
 
     def cancel(self, params: dict, ctx: Any) -> dict:
-        job = params.get("jobId")
-        self.task(job)
+        job = self.task(params.get("jobId"))["jobId"]
         with self._lock:
             self._cancel[job].set()
         return {"ok": True}
@@ -136,7 +135,7 @@ class ZaobaoAPI:
         return {"ok": True}
 
     def open_original(self, params: dict, ctx: Any) -> dict:
-        url = self.service._summary(params.get("articleId")).url
+        url = self.service.summary(params.get("articleId")).url
         return {"ok": bool(webbrowser.open(url))}
 
     def _prune(self) -> None:

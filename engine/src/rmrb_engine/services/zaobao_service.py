@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 
 from ..core.errors import EngineError, ErrorCode
+from ..core.zaobao_models import ZaobaoSummary
 from ..net.zaobao import ZaobaoHttp, check_cancel
 from ..site.zaobao import FEED_URL, parse_article, parse_feed
 from ..store.db import Database
@@ -31,7 +32,7 @@ class ZaobaoService:
     def feed(self) -> dict:
         return self.repo.feed()
 
-    def _summary(self, identity: str):
+    def summary(self, identity: object) -> ZaobaoSummary:
         if (
             not isinstance(identity, str)
             or not identity.isascii()
@@ -44,9 +45,9 @@ class ZaobaoService:
             raise EngineError(ErrorCode.BAD_REQUEST, "文章不在已发现的中国频道列表中")
         return summary
 
-    def article(self, identity: str) -> dict:
-        self._summary(identity)
-        article = self.repo.article(identity)
+    def article(self, identity: object) -> dict:
+        summary = self.summary(identity)
+        article = self.repo.article(summary.article_id)
         return {"cached": article is not None, "article": article.dump() if article else None}
 
     def refresh_feed(self, cancel: threading.Event) -> None:
@@ -61,7 +62,7 @@ class ZaobaoService:
     def fetch_article(
         self, identity: str, cancel: threading.Event, *, refresh: bool = False
     ) -> None:
-        summary = self._summary(identity)
+        summary = self.summary(identity)
         with self._mutation:
             if not refresh and self.repo.article(identity) is not None:
                 return
@@ -73,8 +74,11 @@ class ZaobaoService:
             self.repo.save_article(article)
             for block in [b for b in article.blocks if b.type == "img"][:32]:
                 check_cancel(cancel)
+                source = block.src
+                if source is None:
+                    continue
                 try:
-                    block.local = self._local_image(block.src, cancel)
+                    block.local = self._local_image(source, cancel)
                 except EngineError as exc:
                     article.warnings.append(exc.message)
             self._check_size(article.dump())
@@ -103,9 +107,9 @@ class ZaobaoService:
             raise EngineError(ErrorCode.DISK_ERROR, "图片缓存写入失败") from exc
         return str(target)
 
-    def mark_read(self, identity: str, read: bool) -> None:
-        self._summary(identity)
-        self.repo.mark_read(identity, read)
+    def mark_read(self, identity: object, read: bool) -> None:
+        summary = self.summary(identity)
+        self.repo.mark_read(summary.article_id, read)
 
     def clear_cache(self) -> dict:
         if not self._mutation.acquire(blocking=False):
