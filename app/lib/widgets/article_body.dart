@@ -15,6 +15,7 @@ class ArticleBody extends StatelessWidget {
     this.metadata,
     this.leading,
     this.missingImagePlaceholder = false,
+    this.remoteImages = false,
   });
 
   final Article article;
@@ -23,6 +24,7 @@ class ArticleBody extends StatelessWidget {
   final String? metadata;
   final Widget? leading;
   final bool missingImagePlaceholder;
+  final bool remoteImages;
 
   @override
   Widget build(BuildContext context) => SelectionArea(
@@ -111,6 +113,13 @@ class ArticleBody extends StatelessWidget {
             child: exists
                 ? Image.file(
                     File(path),
+                    fit: BoxFit.fitWidth,
+                    cacheWidth: 1600,
+                    errorBuilder: (context, error, stack) => placeholder,
+                  )
+                : remoteImages && block.src != null
+                ? Image.network(
+                    block.src!,
                     fit: BoxFit.fitWidth,
                     cacheWidth: 1600,
                     errorBuilder: (context, error, stack) => placeholder,

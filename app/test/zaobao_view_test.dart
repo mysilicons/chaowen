@@ -20,7 +20,7 @@ class NewsEngine extends EngineClient {
   });
   final bool cached;
   final bool preview;
-  final bool failRefresh;
+  bool failRefresh;
   final bool paged;
   final int extraItems;
   bool loadedOlder = false;
@@ -47,6 +47,7 @@ class NewsEngine extends EngineClient {
             'title': '测试中国新闻',
             'url': 'https://www.zaobao.com/news/china/story20261030-123',
             'read': false,
+            'excerpt': '不应显示的摘要',
           },
           {
             'articleId': '456',
@@ -136,6 +137,35 @@ Future<void> mount(
 }
 
 void main() {
+  testWidgets('summaries never appear even when the feed supplies them', (
+    tester,
+  ) async {
+    await mount(tester, NewsEngine());
+    expect(find.text('不应显示的摘要'), findsNothing);
+  });
+
+  testWidgets('each return to the source resets session and refreshes again', (
+    tester,
+  ) async {
+    final engine = NewsEngine();
+    Widget view(bool active) => ProviderScope(
+      overrides: [engineProvider.overrideWithValue(engine)],
+      child: MaterialApp(
+        home: Scaffold(body: ZaobaoView(active: active)),
+      ),
+    );
+    await tester.pumpWidget(view(true));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(view(false));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(view(true));
+    await tester.pumpAndSettle();
+    expect(engine.calls.where((m) => m == 'zaobao.feed.refresh').length, 2);
+    expect(
+      engine.calls.where((m) => m == 'zaobao.session.reset').length,
+      greaterThanOrEqualTo(2),
+    );
+  });
   testWidgets(
     'dark narrow layout and reading use shared typography without overflow',
     (tester) async {
@@ -261,16 +291,21 @@ void main() {
     expect(find.textContaining('这是独立提取的正文'), findsOneWidget);
   });
 
-  testWidgets('preview is labelled and refresh failure preserves list', (
-    tester,
-  ) async {
-    await mount(tester, NewsEngine(preview: true, failRefresh: true));
-    await tester.tap(find.byTooltip('刷新文章列表'));
-    await tester.pumpAndSettle();
-    expect(find.text('测试中国新闻'), findsOneWidget);
-    expect(find.textContaining('网络暂不可用'), findsWidgets);
-    await tester.tap(find.text('测试中国新闻'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('当前为可访问的预览'), findsOneWidget);
-  });
+  testWidgets(
+    'preview is labelled and failed new refresh does not retain news',
+    (tester) async {
+      final engine = NewsEngine(preview: true);
+      await mount(tester, engine);
+      await tester.tap(find.text('测试中国新闻'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('当前为可访问的预览'), findsOneWidget);
+      await tester.tap(find.byTooltip('返回文章列表'));
+      await tester.pumpAndSettle();
+      engine.failRefresh = true;
+      await tester.tap(find.byTooltip('刷新文章列表'));
+      await tester.pumpAndSettle();
+      expect(find.text('测试中国新闻'), findsNothing);
+      expect(find.textContaining('网络暂不可用'), findsWidgets);
+    },
+  );
 }

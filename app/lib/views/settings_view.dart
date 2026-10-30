@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/providers.dart';
 import '../theme/palette.dart';
+import '../core/app_log.dart';
 
 /// 设置页：独立视图，替代原来的弹框。
 class SettingsView extends ConsumerWidget {
@@ -29,6 +30,29 @@ class SettingsView extends ConsumerWidget {
           ),
           const SizedBox(height: 22),
           _Section(
+            title: '诊断日志',
+            children: [
+              _Row(
+                label: '日志目录',
+                value: AppLog.directory,
+                action: TextButton(
+                  onPressed: () => _reveal(ref, AppLog.directory),
+                  child: const Text('打开', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '自动记录错误与崩溃。界面、引擎各保留 3 个、每个不超过 1 MiB 的日志；原生崩溃日志最多 512 KiB。',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.6,
+                  color: context.colors.text2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _Section(
             title: '存储',
             children: [
               _Row(
@@ -44,14 +68,19 @@ class SettingsView extends ConsumerWidget {
                 label: '缓存目录',
                 value: hello.value?['cache'] as String? ?? '—',
                 action: TextButton(
-                  onPressed: () => _reveal(ref, hello.value?['cache'] as String?),
+                  onPressed: () =>
+                      _reveal(ref, hello.value?['cache'] as String?),
                   child: const Text('打开', style: TextStyle(fontSize: 12)),
                 ),
               ),
               const SizedBox(height: 10),
               Text(
                 '切换下载目录不会迁移已有文件；旧目录里的内容需要手动搬过去。',
-                style: TextStyle(fontSize: 11, height: 1.6, color: context.colors.text2),
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.6,
+                  color: context.colors.text2,
+                ),
               ),
             ],
           ),
@@ -84,8 +113,13 @@ class SettingsView extends ConsumerWidget {
                 children: [
                   SizedBox(
                     width: 76,
-                    child: Text('正文字号',
-                        style: TextStyle(fontSize: 12, color: context.colors.text2)),
+                    child: Text(
+                      '正文字号',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.text2,
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: Slider(
@@ -93,7 +127,8 @@ class SettingsView extends ConsumerWidget {
                       min: 0.85,
                       max: 1.5,
                       divisions: 13,
-                      label: '${(ref.watch(readerScaleProvider) * 100).round()}%',
+                      label:
+                          '${(ref.watch(readerScaleProvider) * 100).round()}%',
                       activeColor: context.colors.brand,
                       onChanged: (value) => ref
                           .read(readerScaleProvider.notifier)
@@ -124,12 +159,19 @@ class SettingsView extends ConsumerWidget {
                     '朝闻 0.1.0 · 引擎 ${hello.value?['engine'] ?? '—'}'
                     '（Python ${hello.value?['python'] ?? '—'}）',
               ),
-              _Row(label: '协议', value: 'IPC v${hello.value?['protocol'] ?? '—'}'),
+              _Row(
+                label: '协议',
+                value: 'IPC v${hello.value?['protocol'] ?? '—'}',
+              ),
               const SizedBox(height: 10),
               Text(
                 '仅供个人学习研究使用，请勿用于商业目的或对外分发。\n'
                 '《人民日报》（电子版）版权归人民网股份有限公司所有。',
-                style: TextStyle(fontSize: 11, height: 1.7, color: context.colors.text2),
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.7,
+                  color: context.colors.text2,
+                ),
               ),
             ],
           ),
@@ -148,7 +190,9 @@ class SettingsView extends ConsumerWidget {
 
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(engineProvider).call('settings.set', {'downloadDir': picked});
+      await ref.read(engineProvider).call('settings.set', {
+        'downloadDir': picked,
+      });
       ref.invalidate(helloProvider);
       ref.invalidate(issueProvider);
       ref.invalidate(monthStatusProvider);
@@ -187,10 +231,16 @@ class _SwitchRow extends StatelessWidget {
       children: [
         SizedBox(
           width: 76,
-          child: Text(label, style: TextStyle(fontSize: 12, color: context.colors.text2)),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: context.colors.text2),
+          ),
         ),
         Expanded(
-          child: Text(hint, style: TextStyle(fontSize: 11, color: context.colors.text2)),
+          child: Text(
+            hint,
+            style: TextStyle(fontSize: 11, color: context.colors.text2),
+          ),
         ),
         Switch(
           value: value,
@@ -252,7 +302,10 @@ class _Row extends StatelessWidget {
       children: [
         SizedBox(
           width: 76,
-          child: Text(label, style: TextStyle(fontSize: 12, color: context.colors.text2)),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: context.colors.text2),
+          ),
         ),
         Expanded(
           child: SelectableText(

@@ -233,19 +233,6 @@ class _Lead extends StatelessWidget {
             color: context.colors.text,
           ),
         ),
-        if ((item.excerpt ?? '').isNotEmpty) ...[
-          const SizedBox(height: 9),
-          Text(
-            item.excerpt!,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.8,
-              color: context.colors.text2,
-            ),
-          ),
-        ],
       ],
     ),
   );
@@ -284,19 +271,6 @@ class _Entry extends StatelessWidget {
               fontWeight: item.read ? FontWeight.w400 : FontWeight.w600,
             ),
           ),
-          if ((item.excerpt ?? '').isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              item.excerpt!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.7,
-                color: context.colors.text2,
-              ),
-            ),
-          ],
         ],
       ),
     ),
@@ -330,15 +304,6 @@ class _Meta extends StatelessWidget {
       ),
       if (item.read)
         Text('已读', style: TextStyle(fontSize: 10, color: context.colors.text2)),
-      if (item.cached)
-        Padding(
-          padding: const EdgeInsets.only(left: 6),
-          child: Icon(
-            Icons.offline_pin_outlined,
-            size: 11,
-            color: context.colors.text2,
-          ),
-        ),
     ],
   );
 

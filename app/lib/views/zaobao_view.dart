@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
+import '../core/app_log.dart';
 import '../core/zaobao_client.dart';
 import '../core/zaobao_models.dart';
 import '../state/providers.dart';
@@ -31,14 +32,12 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   String? _error;
   String? _job;
   bool _busy = false;
-  bool _started = false;
   bool _supported = true;
   int _generation = 0;
   bool _loadingMore = false;
   bool _hasMore = false;
   int? _nextOffset;
   String? _moreError;
-  StreamSubscription<EngineEvent>? _updates;
 
   ZaobaoClient get api => ZaobaoClient(ref.read(engineProvider));
 
@@ -46,42 +45,62 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
   void initState() {
     super.initState();
     _listScroll.addListener(_onScroll);
-    _updates = ref.read(engineProvider).events.listen((event) {
-      if (event.name == 'zaobao.article.updated' &&
-          event.data['articleId'] == _selected?.id) {
-        unawaited(_readArticle(_selected!.id, _generation));
-      }
-    });
     if (widget.active) _start();
   }
 
   @override
   void didUpdateWidget(covariant ZaobaoView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.active && !_started) _start();
+    if (widget.active && !oldWidget.active) _start();
+    if (!widget.active && oldWidget.active) {
+      _generation++;
+      setState(() {
+        _items = [];
+        _article = null;
+        _selected = null;
+        _busy = false;
+        _loadingMore = false;
+        _job = null;
+      });
+      unawaited(_resetSession());
+    }
   }
 
   void _start() {
-    _started = true;
     unawaited(_load());
   }
 
   @override
   void dispose() {
     _generation++;
-    unawaited(_updates?.cancel());
     _listScroll.dispose();
     _articleScroll.dispose();
     super.dispose();
   }
 
-  bool _current(int token) => mounted && token == _generation;
+  bool _current(int token) => mounted && widget.active && token == _generation;
 
-  Future<void> _load({bool refresh = false}) async {
+  Future<void> _resetSession() async {
+    try {
+      await api.call('zaobao.session.reset');
+    } catch (error, stack) {
+      AppLog.capture('zaobao.reset.failed', error, stack);
+    }
+  }
+
+  Future<void> _load() async {
     final token = ++_generation;
     setState(() {
       _busy = true;
       _error = null;
+      _items = [];
+      _article = null;
+      _selected = null;
+      _fetchedAt = null;
+      _hasMore = false;
+      _nextOffset = null;
+      _moreError = null;
+      _loadingMore = false;
     });
     try {
       final hello = await api.call('hello');
@@ -90,9 +109,9 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
       if (!_supported) {
         throw const EngineException('VERSION', '当前引擎不支持早报阅读，请使用配套的新版本引擎');
       }
-      await _readFeed(token);
+      await api.call('zaobao.session.reset');
       if (!_current(token)) return;
-      if (refresh || _items.isEmpty) {
+      {
         await api.run(
           'zaobao.feed.refresh',
           {},
@@ -143,24 +162,26 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
 
   Future<void> _more() async {
     if (_loadingMore || _busy) return;
+    final token = _generation;
     setState(() {
       _loadingMore = true;
       _moreError = null;
     });
     try {
-      // Read already downloaded pages first; navigating back never skips a page.
+      // Reuse pages only within this active in-memory session.
       var data = await api.call('zaobao.feed.get', {'offset': _items.length});
+      if (!_current(token)) return;
       if ((data['items'] as List<dynamic>? ?? []).isEmpty &&
           data['hasMore'] == true) {
         await api.run(
           'zaobao.feed.more',
           {},
-          isCurrent: () => mounted,
+          isCurrent: () => _current(token),
           onJob: (_) {},
         );
         data = await api.call('zaobao.feed.get', {'offset': _items.length});
       }
-      if (!mounted) return;
+      if (!_current(token)) return;
       final known = _items.map((item) => item.id).toSet();
       final added = (data['items'] as List<dynamic>? ?? [])
           .map((value) => ZaobaoItem.fromJson(value as Map<String, dynamic>))
@@ -171,9 +192,9 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
         _nextOffset = data['nextOffset'] as int?;
       });
     } catch (error) {
-      if (mounted) setState(() => _moreError = _message(error));
+      if (_current(token)) setState(() => _moreError = _message(error));
     } finally {
-      if (mounted) setState(() => _loadingMore = false);
+      if (_current(token)) setState(() => _loadingMore = false);
     }
   }
 
@@ -281,30 +302,12 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
     }
   }
 
-  Future<void> _clear() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('清理早报缓存'),
-        content: const Text('删除已缓存的早报正文和图片，保留文章列表和已读状态。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('清理'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+  Future<void> _showLogs() async {
     try {
-      await api.call('zaobao.cache.clear');
-      if (mounted) await _readFeed(_generation);
-    } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
+      await api.call('storage.reveal', {'path': AppLog.directory});
+    } catch (error, stack) {
+      AppLog.capture('logs.open.failed', error, stack);
+      if (mounted) setState(() => _error = '无法打开日志目录');
     }
   }
 
@@ -322,7 +325,7 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
           if (_article!.state == 'preview') _notice('当前为可访问的预览，请前往官网继续阅读'),
           if (_article!.state != 'preview' && _article!.state != 'full')
             _notice('无法确认内容是否完整，可查看原文'),
-          if (_article!.warnings.isNotEmpty) _notice('部分图片未能缓存，文字仍可阅读'),
+          if (_article!.warnings.isNotEmpty) _notice('部分内容未能完整提取，可查看原文'),
         ],
         Expanded(
           child: IndexedStack(
@@ -395,33 +398,28 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
             icon: Icons.refresh,
             onPressed: _busy || _loadingMore || !_supported
                 ? null
-                : () => _load(refresh: true),
+                : () => _load(),
           ),
         ],
-        PopupMenuButton<String>(
-          tooltip: '更多操作',
-          iconSize: 17,
-          icon: Icon(Icons.more_horiz, color: context.colors.text2, size: 18),
-          onSelected: (action) {
-            if (action == 'clear') unawaited(_clear());
-            if (action == 'refresh' && selected != null) {
-              unawaited(_open(selected, refresh: true));
-            }
-          },
-          itemBuilder: (_) => [
-            if (selected != null)
+        ReaderTextAction(label: '日志', onPressed: _showLogs),
+        if (selected != null)
+          PopupMenuButton<String>(
+            tooltip: '更多操作',
+            iconSize: 17,
+            icon: Icon(Icons.more_horiz, color: context.colors.text2, size: 18),
+            onSelected: (action) {
+              if (action == 'refresh') {
+                unawaited(_open(selected, refresh: true));
+              }
+            },
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'refresh',
                 enabled: !_busy,
                 child: const Text('重新提取文章', style: TextStyle(fontSize: 12)),
               ),
-            PopupMenuItem(
-              value: 'clear',
-              enabled: !_busy && !_loadingMore && _supported,
-              child: const Text('清理早报缓存', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
+            ],
+          ),
       ],
     ),
   );
@@ -501,6 +499,7 @@ class _ZaobaoViewState extends ConsumerState<ZaobaoView> {
                   scale: scale,
                   controller: _articleScroll,
                   missingImagePlaceholder: true,
+                  remoteImages: true,
                   metadata:
                       '来源：联合早报${_article!.publishedAt == null ? '' : ' · ${_displayTime(_article!.publishedAt)}'}',
                 )

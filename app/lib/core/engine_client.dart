@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import 'models.dart';
+import 'app_log.dart';
 
 /// 与引擎的传输通道。抽象出来是为了让测试不需要真的起进程。
 abstract class EngineTransport {
@@ -15,9 +16,17 @@ abstract class EngineTransport {
 }
 
 class ProcessTransport implements EngineTransport {
-  ProcessTransport(this._process);
+  ProcessTransport(this._process) {
+    _stderr = _process.stderr.listen((bytes) {
+      AppLog.warning('engine.stderr bytes=${bytes.length}');
+    });
+    unawaited(
+      _process.exitCode.then((code) => AppLog.info('engine.exit code=$code')),
+    );
+  }
 
   final Process _process;
+  StreamSubscription<List<int>>? _stderr;
 
   @override
   Stream<String> get lines =>
@@ -34,6 +43,7 @@ class ProcessTransport implements EngineTransport {
   @override
   Future<void> kill() async {
     _process.kill();
+    await _stderr?.cancel();
   }
 }
 
@@ -45,7 +55,9 @@ String resolveEngineDir() {
   var dir = Directory.current;
   for (var depth = 0; depth < 10; depth++) {
     final candidate = p.join(dir.path, 'engine');
-    if (File(p.join(candidate, 'pyproject.toml')).existsSync()) return candidate;
+    if (File(p.join(candidate, 'pyproject.toml')).existsSync()) {
+      return candidate;
+    }
     final parent = dir.parent;
     if (parent.path == dir.path) break;
     dir = parent;
@@ -87,11 +99,9 @@ class EngineClient {
   static Future<EngineTransport> _spawn() async {
     final bundled = bundledEnginePath();
     if (bundled != null) {
-      final process = await Process.start(
-        bundled,
-        ['--serve'],
-        workingDirectory: File(bundled).parent.path,
-      );
+      final process = await Process.start(bundled, [
+        '--serve',
+      ], workingDirectory: File(bundled).parent.path);
       return ProcessTransport(process);
     }
 
@@ -107,8 +117,12 @@ class EngineClient {
   }
 
   Future<void> start({Duration timeout = const Duration(seconds: 20)}) async {
-    if (status.value == EngineState.ready || status.value == EngineState.starting) return;
+    if (status.value == EngineState.ready ||
+        status.value == EngineState.starting) {
+      return;
+    }
     status.value = EngineState.starting;
+    AppLog.info('engine.start');
     lastError = null;
 
     try {
@@ -119,19 +133,22 @@ class EngineClient {
         onError: (Object error) => _fail(error.toString()),
         onDone: () => _fail('引擎进程已退出'),
       );
-      final hello = await call(
-        'hello',
-        {'protocol': 1, 'client': 'rmrb-reader/0.1.0'},
-        timeout,
-      );
-      final helloMap = hello is Map<String, dynamic> ? hello : const <String, dynamic>{};
+      final hello = await call('hello', {
+        'protocol': 1,
+        'client': 'rmrb-reader/0.1.0',
+      }, timeout);
+      final helloMap = hello is Map<String, dynamic>
+          ? hello
+          : const <String, dynamic>{};
       protocol = (helloMap['protocol'] as num?)?.toInt() ?? 0;
       engineVersion = helloMap['engine'] as String?;
       if (protocol != 1) {
         throw EngineException('PROTOCOL_MISMATCH', '引擎协议版本不匹配：$protocol');
       }
       status.value = EngineState.ready;
+      AppLog.info('engine.ready protocol=$protocol version=$engineVersion');
     } catch (error) {
+      AppLog.capture('engine.start.failed', error, StackTrace.current);
       lastError = error.toString();
       status.value = EngineState.failed;
       await _teardown();
@@ -151,6 +168,9 @@ class EngineClient {
     final id = _nextId++;
     final completer = Completer<Object?>();
     _pending[id] = completer;
+    if (method != 'zaobao.task.get') {
+      AppLog.info('rpc.send id=$id method=$method');
+    }
 
     final payload = <String, dynamic>{'id': id, 'method': method};
     if (params != null) payload['params'] = params;
@@ -160,6 +180,7 @@ class EngineClient {
       timeout,
       onTimeout: () {
         _pending.remove(id);
+        AppLog.warning('rpc.timeout id=$id method=$method');
         throw EngineException('TIMEOUT', '引擎响应超时：$method');
       },
     );
@@ -174,7 +195,9 @@ class EngineClient {
       message = decoded;
     } catch (_) {
       // 协议流被污染是严重问题，留证据但不炸客户端
-      _stderrTail.add('非法协议行: $line');
+      AppLog.warning('rpc.invalid_json bytes=${utf8.encode(line).length}');
+      _stderrTail.add('非法协议行（内容已省略）');
+      if (_stderrTail.length > 40) _stderrTail.removeAt(0);
       return;
     }
 
@@ -198,7 +221,10 @@ class EngineClient {
       completer.complete(message['result']);
     } else {
       final error = message['error'];
-      final map = error is Map<String, dynamic> ? error : const <String, dynamic>{};
+      final map = error is Map<String, dynamic>
+          ? error
+          : const <String, dynamic>{};
+      AppLog.warning('rpc.failed id=$id code=${map['code']}');
       completer.completeError(
         EngineException(
           map['code'] as String? ?? 'UNKNOWN',
@@ -211,6 +237,7 @@ class EngineClient {
 
   void _fail(String reason) {
     if (_disposed) return;
+    AppLog.warning('engine.disconnected');
     status.value = EngineState.crashed;
     lastError = reason;
     for (final completer in _pending.values) {
