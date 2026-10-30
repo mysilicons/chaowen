@@ -215,18 +215,18 @@ Flutter 应用（客户端）与 Python 引擎（服务端）之间的本地通�
 
 | method | params | result |
 | --- | --- | --- |
-| `zaobao.feed.get` | `{offset?:0,limit?:60}` | `{items:[ZaobaoSummary + {read,cached}],fetchedAt,total,nextOffset,nextPage,hasMore}`；只读本地，limit 1–100 |
+| `zaobao.feed.get` | `{offset?:0,limit?:60}` | `{items:[ZaobaoSummary + {read,cached}],fetchedAt,total,nextOffset,nextPage,hasMore}`；只读当前会话内存，limit 1–100 |
 | `zaobao.feed.refresh` | `{}` | `{jobId}`；后台刷新固定入口 |
 | `zaobao.feed.more` | `{}` | `{jobId}`；追加中国频道官网下滑使用的下一页；游标由引擎管理 |
-| `zaobao.article.get` | `{articleId}` | `{cached:boolean,article:ZaobaoArticle|null}`；只读本地 |
-| `zaobao.article.fetch` | `{articleId,refresh?:boolean}` | `{jobId}`；正文提交即完成，最多 32 张图片独立后台补齐 |
+| `zaobao.article.get` | `{articleId}` | `{cached:boolean,article:ZaobaoArticle|null}`；只读当前会话内存 |
+| `zaobao.article.fetch` | `{articleId,refresh?:boolean}` | `{jobId}`；正文提交内存即完成；图片由客户端直接请求，不落盘 |
 | `zaobao.task.get` | `{jobId}` | `{jobId,kind,articleId,state,error}`；kind 为 feed/more/article |
 | `zaobao.task.cancel` | `{jobId}` | `{ok:true}`；下一请求或读取块处中断 |
-| `zaobao.read.set` | `{articleId,read:boolean}` | `{ok:true}`；保留已读状态 |
-| `zaobao.cache.clear` | `{}` | `{bytes:number}`；清正文与图片，保留列表及已读；任务运行中拒绝清理 |
+| `zaobao.read.set` | `{articleId,read:boolean}` | `{ok:true}`；仅在当前会话内保留已读状态 |
+| `zaobao.session.reset` | `{}` | `{session:number}`；取消旧任务，清空列表、正文、页码与已读内存，切换会话代次 |
 | `zaobao.original.open` | `{articleId}` | `{ok:boolean}`；用户点击时用系统浏览器打开已登记原文 |
 
-`ZaobaoSummary` 字段：`articleId,title,url,author?,publishedAt?,updatedAt?,timeLabel?,thumbnail?,excerpt?`。当前频道页面只给相对时间时保留为 timeLabel，不假造发布时间；官方分页提供的摘要保留为 excerpt。
+`ZaobaoSummary` 字段：`articleId,title,url,author?,publishedAt?,updatedAt?,timeLabel?,thumbnail?`。当前频道页面只给相对时间时保留为 timeLabel，不假造发布时间；不接收或返回标题下的摘要。
 
 `ZaobaoArticle` 在摘要基础上增加 `blocks,access,contentState,parserVersion,fetchedAt,warnings`。块格式与现有 Block 一致；`access=public|subscriber|login_required|unknown`，`contentState=full|preview|unknown|unsupported`。full 由已核验的 `.com` 正文模板与 NewsArticle 元数据共同判定；明显受限标记优先判 preview。模板变化时不能把 JSON-LD 的摘要当作正文。
 
@@ -234,8 +234,12 @@ Flutter 应用（客户端）与 Python 引擎（服务端）之间的本地通�
 
 新增错误码：`RATE_LIMITED`（429，保留 Retry-After 等待）、`ACCESS_DENIED`（401/403）、`NOT_FOUND`（404）、`CONTENT_TOO_LARGE`（页面／正文超限）。其余沿用已有错误。正文预算 700 KiB，不静默截断；图片走本地文件，不进入 NDJSON。任务等待不占用普通 RPC 的 30 秒调用时限。
 
-正文事务存放在 SQLite，与摘要／已读分开；图片缓存位于 `cache/zaobao/media/`。正文提交即结束 article 任务，图片独立单 worker 加载。`zaobao.article.updated` 事件载荷为 `{articleId,fetchedAt}`，客户端收到当前文章的更新后重读正文，不再每 500ms 重读整篇。图片通过 fetchedAt 比对更新，避免旧下载覆盖重新提取的正文；清缓存会取消后台图片，避免内容复活。
+早报数据全部驻留内存，不创建早报数据库表、文件或图片缓存。`cached` 仅表示本会话内已提取正文，并不表示磁盘缓存或可跨进程恢复。客户端进入、离开来源和手动刷新时调用 `zaobao.session.reset`；重新进入必定请求首页。旧会话中的在途结果不可提交到新会话。删除旧版 `zaobao.article.updated` 媒体事件；正文图片使用 `src`，`local=null`。
 
 中国频道的 LoadMoreArticle 前端公开使用 `https://zbapi.zbstatic5.com/more/sitemap/8?pageNo=N&pageSize=27`，从第 2 页开始。引擎只允许此固定 endpoint 和合法页码，不接受调用方输入 API URL。失败不推进游标，空页或明确总数末尾结束；本地页通过 offset 分段返回，避免单条 NDJSON 随无限滚动膨胀。schema v3 为旧 feed_state 增加 next_page/has_more，升级前以 SQLite backup API 备份。
 
 分页请求按官网公开 Request 客户端协议生成 x-amz-date / x-auth 校验头，仅覆盖固定的公开中国频道分页接口；不使用账号、Cookie 或订阅凭据。校验算法和测试位于 `net/zaobao_signing.py` 与 `tests/test_zaobao_signing.py`。
+
+## 9. 诊断日志（2026-10-30）
+
+`hello` 新增 `logDir`。stdout 仍严格使用 NDJSON；日志独立写入 `logs/app.log`、`engine.log`、`native.log`，不混入协议。记录事件、错误类型、代码位置、HTTP 状态与耗时，不输出新闻正文或请求凭据。轮转预算与异常捕获边界见《联合早报-无持久化与诊断日志》。

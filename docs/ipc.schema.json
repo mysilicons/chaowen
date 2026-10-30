@@ -21,7 +21,6 @@
         "updatedAt": { "type": ["string", "null"] },
         "timeLabel": { "type": ["string", "null"] },
         "thumbnail": { "type": ["string", "null"] },
-        "excerpt": { "type": ["string", "null"] },
         "cached": { "type": "boolean" },
         "read": { "type": "boolean" }
       }
@@ -138,8 +137,7 @@
             "article.progress",
             "issue.archived",
             "job.finished",
-            "zaobao.task.changed",
-            "zaobao.article.updated"
+            "zaobao.task.changed"
           ]
         },
         "data": { "type": "object" }
