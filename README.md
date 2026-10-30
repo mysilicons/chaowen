@@ -60,7 +60,7 @@
 
 ## 安装
 
-**下载**：[最新版本](https://github.com/mysilicons/chaowen/releases/latest) → 下载 `朝闻-x.x.x-setup.exe`（约 54 MB）→ 双击安装。
+**下载**：[最新版本](https://github.com/mysilicons/chaowen/releases/latest) → 下载 `Chaowen-x.x.x-setup.exe`（约 54 MB）→ 双击安装。
 
 - 默认装到当前用户目录，**不需要管理员权限**
 - 安装位置可自选，也可以选择「为所有用户安装」

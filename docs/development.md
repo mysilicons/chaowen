@@ -68,7 +68,7 @@ Copy-Item -Recurse ..\engine\dist\rmrb_engine build\windows\x64\runner\Release\e
 pwsh ..\scripts\build_installer_inno.ps1
 ```
 
-产物：`dist\朝闻-<版本>-setup.exe`。
+产物：`dist\Chaowen-<版本>-setup.exe`。
 
 版本号需要一起改的地方：`scripts/installer.iss` 的 `AppVersion` 与 `VersionInfoVersion`、`app/pubspec.yaml` 的 `version`、`app/lib/views/settings_view.dart` 的版本文案、`app/lib/core/engine_client.dart` 的 client 标识、`engine/src/rmrb_engine/__init__.py` 与 `engine/pyproject.toml` 的版本，以及新增的 `docs/release-notes-<版本>.md`。
 
