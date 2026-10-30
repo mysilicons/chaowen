@@ -70,7 +70,7 @@ pwsh ..\scripts\build_installer_inno.ps1
 
 产物：`dist\朝闻-<版本>-setup.exe`。
 
-版本号在 `scripts/installer.iss` 的 `AppVersion`、`app/pubspec.yaml`、`docs/release-notes-*.md` 三处，发版时一起改。
+版本号需要一起改的地方：`scripts/installer.iss` 的 `AppVersion` 与 `VersionInfoVersion`、`app/pubspec.yaml` 的 `version`、`app/lib/views/settings_view.dart` 的版本文案、`app/lib/core/engine_client.dart` 的 client 标识、`engine/src/rmrb_engine/__init__.py` 与 `engine/pyproject.toml` 的版本，以及新增的 `docs/release-notes-<版本>.md`。
 
 ## 测试
 
@@ -99,7 +99,7 @@ uv run --with fonttools python scripts/build_fonts.py --subset   # GB2312 子集
 
 ## 项目状态
 
-v0.1.0 已可交付：书架 / 双模式阅读 / 单日与批量下载 / 安装包。
+v0.2.0 已可交付：书架 / 双模式阅读 / 单日与批量下载 / 联合早报中国频道阅读 / 安装包（支持覆盖升级）。
 进度以 [开发计划书](人民日报阅报器-开发计划书.md) 为准，验收记录在 `docs/acceptance/`。
 
 | 阶段 | 内容 | 状态 |

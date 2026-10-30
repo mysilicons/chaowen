@@ -1,7 +1,7 @@
 [project]
 name = "rmrb-engine"
-version = "0.1.0"
-description = "人民日报阅报器的本地引擎：抓取、解析、合并"
+version = "0.2.0"
+description = "朝闻的本地引擎：人民日报存档、联合早报阅读、抓取与合并"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [

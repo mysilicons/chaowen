@@ -135,7 +135,7 @@ class EngineClient {
       );
       final hello = await call('hello', {
         'protocol': 1,
-        'client': 'rmrb-reader/0.1.0',
+        'client': 'rmrb-reader/0.2.0',
       }, timeout);
       final helloMap = hello is Map<String, dynamic>
           ? hello

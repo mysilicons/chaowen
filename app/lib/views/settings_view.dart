@@ -156,7 +156,7 @@ class SettingsView extends ConsumerWidget {
               _Row(
                 label: '版本',
                 value:
-                    '朝闻 0.1.0 · 引擎 ${hello.value?['engine'] ?? '—'}'
+                    '朝闻 0.2.0 · 引擎 ${hello.value?['engine'] ?? '—'}'
                     '（Python ${hello.value?['python'] ?? '—'}）',
               ),
               _Row(

@@ -231,7 +231,7 @@ class ReaderScale extends Notifier<double> {
 final helloProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final raw = await ref
       .watch(engineProvider)
-      .call('hello', {'protocol': 1, 'client': 'rmrb-reader/0.1.0'});
+      .call('hello', {'protocol': 1, 'client': 'rmrb-reader/0.2.0'});
   return raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
 });
 
