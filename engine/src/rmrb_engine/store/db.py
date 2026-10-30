@@ -6,7 +6,7 @@ import sqlite3
 import threading
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 DDL = """
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -66,27 +66,17 @@ class Database:
         return conn
 
     def _init_schema(self) -> None:
-        from .zaobao_repo import ZAOBAO_DDL
-
         self.conn.executescript(DDL)
         row = self.conn.execute("SELECT value FROM schema_meta WHERE key='version'").fetchone()
         version = int(row[0]) if row else 0
         if version > SCHEMA_VERSION:
             raise RuntimeError("数据库版本较新，请更新朝闻后再打开")
-        if version in {1, 2}:
-            with sqlite3.connect(str(self.path) + f".v{version}.bak") as backup:
-                self.conn.backup(backup)
         with self.conn:
             self.conn.execute("BEGIN IMMEDIATE")
-            for statement in ZAOBAO_DDL:
-                self.conn.execute(statement)
-            columns = {row[1] for row in self.conn.execute("PRAGMA table_info(zaobao_feed_state)")}
-            for column in ("next_page", "has_more"):
-                if column not in columns:
-                    default = 2 if column == "next_page" else 1
-                    self.conn.execute(
-                        f"ALTER TABLE zaobao_feed_state ADD COLUMN {column} INTEGER NOT NULL DEFAULT {default}"
-                    )
+            if version < 4:
+                # Only the retired news cache is removed; newspaper tables stay intact.
+                for table in ("zaobao_feed_items", "zaobao_feed_state", "zaobao_articles"):
+                    self.conn.execute(f"DROP TABLE IF EXISTS {table}")
             self.conn.execute(
                 "INSERT INTO schema_meta(key, value) VALUES('version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (str(SCHEMA_VERSION),),

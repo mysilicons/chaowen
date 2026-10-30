@@ -1,5 +1,4 @@
 import threading
-from pathlib import Path
 
 import httpx
 import pytest
@@ -14,7 +13,7 @@ from rmrb_engine.store.db import Database
 
 def make_service(tmp_path, handler):
     http = ZaobaoHttp(client=httpx.Client(transport=httpx.MockTransport(handler)), interval=0)
-    return ZaobaoService(Database(tmp_path / "state.db"), tmp_path / "cache", http=http)
+    return ZaobaoService(http=http)
 
 
 def test_feed_refresh_never_fetches_article_and_cache_is_offline(tmp_path):
@@ -58,26 +57,7 @@ def test_failed_refresh_keeps_snapshot_and_unknown_id_is_rejected(tmp_path):
     service.close()
 
 
-def test_clear_preserves_read_state_and_people_tables(tmp_path):
-    service = make_service(
-        tmp_path,
-        lambda r: httpx.Response(
-            200,
-            text=FEED if str(r.url) == FEED_URL else ARTICLE,
-            headers={"content-type": "text/html"},
-        ),
-    )
-    service.refresh_feed(threading.Event())
-    service.fetch_article("1234567", threading.Event())
-    service.mark_read("1234567", True)
-    service.clear_cache()
-    assert service.article("1234567")["cached"] is False
-    assert service.feed()["items"][0]["read"] is True
-    assert service.db.conn.execute("SELECT COUNT(*) FROM issues").fetchone()[0] == 0
-    service.close()
-
-
-def test_v1_upgrade_preserves_data_and_reopens(tmp_path):
+def test_upgrade_removes_only_news_tables(tmp_path):
     import sqlite3
 
     from rmrb_engine.store.db import DDL
@@ -85,21 +65,17 @@ def test_v1_upgrade_preserves_data_and_reopens(tmp_path):
     path = tmp_path / "state.db"
     with sqlite3.connect(path) as conn:
         conn.executescript(DDL)
-        conn.execute("INSERT INTO schema_meta VALUES('version','1')")
+        conn.execute("INSERT INTO schema_meta VALUES('version','3')")
         conn.execute(
             "INSERT INTO issues(date,status,updated_at) VALUES('2026-10-29','archived','now')"
         )
+        conn.execute("CREATE TABLE zaobao_articles(article_id TEXT PRIMARY KEY,body TEXT)")
+        conn.execute("INSERT INTO zaobao_articles VALUES('123','retired news body')")
     db = Database(path)
-    from rmrb_engine.store.db import SCHEMA_VERSION
-
-    assert db.conn.execute("SELECT value FROM schema_meta WHERE key='version'").fetchone()[
-        0
-    ] == str(SCHEMA_VERSION)
     assert db.conn.execute("SELECT status FROM issues").fetchone()[0] == "archived"
-    db.close()
-    assert Path(str(path) + ".v1.bak").exists()
-    db = Database(path)
-    assert db.conn.execute("SELECT COUNT(*) FROM zaobao_articles").fetchone()[0] == 0
+    assert not db.conn.execute(
+        "SELECT name FROM sqlite_master WHERE name LIKE 'zaobao_%'"
+    ).fetchall()
     db.close()
 
 
@@ -141,30 +117,28 @@ def test_403_does_not_retry_and_size_limit_is_enforced():
         http.request(URL, threading.Event(), max_bytes=20)
 
 
-def test_image_failure_preserves_readable_text(tmp_path):
-    cancel = threading.Event()
+def test_backend_does_not_download_or_store_images(tmp_path):
     seen = []
 
     def handler(request):
         seen.append(str(request.url))
-        if str(request.url) == FEED_URL:
-            return httpx.Response(200, text=FEED, headers={"content-type": "text/html"})
-        if str(request.url) == URL:
-            return httpx.Response(200, text=ARTICLE, headers={"content-type": "text/html"})
-        return httpx.Response(403)
+        return httpx.Response(
+            200,
+            text=FEED if str(request.url) == FEED_URL else ARTICLE,
+            headers={"content-type": "text/html"},
+        )
 
-    service = make_service(tmp_path, handler)
-    updated = threading.Event()
-    service.emit = lambda event, data: updated.set()
-    service.refresh_feed(cancel)
-    service.fetch_article("1234567", cancel)
-    assert updated.wait(1)
-    assert service.article("1234567")["article"]["blocks"][1]["text"] == "第一段加粗。"
-    assert service.article("1234567")["article"]["warnings"]
-    assert all(
-        url in {FEED_URL, URL} or url.startswith("https://dss0.zbstatic5.com/") for url in seen
+    current = make_service(tmp_path, handler)
+    current.refresh_feed(threading.Event())
+    current.fetch_article("1234567", threading.Event())
+    assert seen == [FEED_URL, URL]
+    assert any(
+        block["src"]
+        for block in current.article("1234567")["article"]["blocks"]
+        if block["type"] == "img"
     )
-    service.close()
+    assert all(block["local"] is None for block in current.article("1234567")["article"]["blocks"])
+    current.close()
 
 
 def test_rate_limit_keeps_full_retry_after_without_retry():
@@ -204,21 +178,3 @@ def test_network_can_be_cancelled_before_any_request():
         http.text(FEED_URL, cancel)
     assert not seen
     http.close()
-
-
-def test_corrupt_body_is_evicted_and_can_be_fetched_again(tmp_path):
-    service = make_service(
-        tmp_path,
-        lambda r: httpx.Response(
-            200,
-            text=FEED if str(r.url) == FEED_URL else ARTICLE,
-            headers={"content-type": "text/html"},
-        ),
-    )
-    service.refresh_feed(threading.Event())
-    with service.db.conn as conn:
-        conn.execute("UPDATE zaobao_articles SET body='broken'")
-    assert service.article("1234567")["cached"] is False
-    service.fetch_article("1234567", threading.Event())
-    assert service.article("1234567")["cached"] is True
-    service.close()

@@ -20,11 +20,13 @@ from platformdirs import user_cache_dir
 from . import __version__
 from .api import Engine
 from .core.paths import LibraryPaths
+from .diagnostics import configure_logging, install_exception_hooks
 from .ipc import RpcServer
 from .net.client import HttpClient
 from .services.queue import DownloadService
 from .store import settings
 from .store.db import Database
+from .store.legacy_news import purge_legacy_news
 from .store.repo import Repo
 
 DEFAULT_BASE_URL = "https://paper.people.com.cn/rmrb/pc/layout/202610/29/node_01.html"
@@ -49,6 +51,7 @@ def default_cache() -> Path:
 
 def build_engine(library: Path, cache: Path) -> Engine:
     db = Database(cache / "state.db")
+    purge_legacy_news(cache)
     repo = Repo(db)
     http = HttpClient()
     paths = LibraryPaths(library=library, cache=cache)
@@ -140,11 +143,15 @@ def main(argv: list[str] | None = None) -> int:
     cache = Path(args.cache) if args.cache else default_cache()
 
     if args.serve:
+        logger = configure_logging()
+        install_exception_hooks()
+        logger.info("engine.start version=%s protocol=1", __version__)
         engine = build_engine(library, cache)
         try:
             RpcServer(engine, sys.stdin, sys.stdout).run()
         finally:
             engine.zaobao.close()
+            logger.info("engine.stop")
         return 0
 
     if args.download:

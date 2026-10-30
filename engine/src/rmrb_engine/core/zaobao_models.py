@@ -16,7 +16,6 @@ class ZaobaoSummary(CamelModel):
     updated_at: str | None = None
     time_label: str | None = None
     thumbnail: str | None = None
-    excerpt: str | None = None
 
 
 class ZaobaoArticle(ZaobaoSummary):

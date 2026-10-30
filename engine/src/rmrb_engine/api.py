@@ -20,6 +20,7 @@ from . import __version__
 from .core.errors import EngineError, ErrorCode
 from .core.models import Issue, Page
 from .core.paths import LibraryPaths, layout_url
+from .diagnostics import log_directory
 from .services.article_service import ArticleService
 from .services.control import Cancelled, IssueControl
 from .services.queue import DownloadService
@@ -54,7 +55,7 @@ class Engine:
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="job")
         self._jobs: dict[str, IssueControl] = {}
         self._jobs_lock = threading.Lock()
-        self.zaobao = ZaobaoAPI(ZaobaoService(repo.db, service.paths.cache))
+        self.zaobao = ZaobaoAPI(ZaobaoService())
 
     def bind_emitter(self, emit: Any) -> None:
         # 服务层的事件必须走同一条通道，否则下载进度到不了客户端
@@ -62,7 +63,6 @@ class Engine:
         self.service.emit = emit
         self.articles.emit = emit
         self.zaobao.emit = emit
-        self.zaobao.service.emit = emit
 
     @property
     def handlers(self) -> dict[str, Any]:
@@ -96,6 +96,7 @@ class Engine:
             "library": str(self.service.paths.library),
             "cache": str(self.service.paths.cache),
             "features": {"zaobaoReaderV1": True},
+            "logDir": str(log_directory()),
         }
 
     def issue_parse(self, params: dict[str, Any], ctx: Any) -> dict[str, Any]:

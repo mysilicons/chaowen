@@ -73,14 +73,12 @@ def _more_item(record: object) -> ZaobaoSummary | None:
         )
     except ValueError:
         stamp = None
-    preview = record.get("contentPreview") or record.get("digest")
     return ZaobaoSummary(
         article_id=identity,
         title=title.strip(),
         url=url,
         published_at=stamp,
         time_label=stamp,
-        excerpt=preview[:400] if isinstance(preview, str) else None,
         thumbnail=media_url(image.get("thumbnail") or image.get("uri") or ""),
     )
 

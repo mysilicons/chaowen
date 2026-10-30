@@ -9,10 +9,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
+import time
 from typing import Any, TextIO
 
 from .core.errors import EngineError, ErrorCode
+from .diagnostics import log_exception
 
 MAX_LINE_BYTES = 1024 * 1024
 
@@ -122,13 +125,18 @@ class RpcServer:
 
         self._responded = False
         ctx = RequestContext(self, request_id)
+        started = time.monotonic()
         try:
             result = handler(params, ctx)
         except EngineError as exc:
+            logging.getLogger("rmrb_engine.rpc").warning(
+                "rpc.failed method=%s id=%s code=%s", method, request_id, exc.code.value
+            )
             if not self._responded:
                 self.write_error(request_id, exc)
             return
         except Exception as exc:  # noqa: BLE001 - 任何异常都不能让进程退出
+            log_exception(f"rpc.exception method={method} id={request_id}", exc)
             if not self._responded:
                 self.write_error(
                     request_id,
@@ -138,3 +146,10 @@ class RpcServer:
 
         if not self._responded:
             self.write_ok(request_id, result)
+        if method != "zaobao.task.get":
+            logging.getLogger("rmrb_engine.rpc").info(
+                "rpc.done method=%s id=%s elapsedMs=%.1f",
+                method,
+                request_id,
+                (time.monotonic() - started) * 1000,
+            )

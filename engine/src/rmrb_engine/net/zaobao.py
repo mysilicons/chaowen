@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from datetime import UTC, datetime
@@ -89,8 +90,26 @@ class ZaobaoHttp:
         headers: dict[str, str] | None = None,
     ) -> tuple[bytes, str]:
         _check_url(url)
-        with self._lock:
-            return self._request(url, cancel, max_bytes, headers)
+        started = time.perf_counter()
+        try:
+            with self._lock:
+                result = self._request(url, cancel, max_bytes, headers)
+            logging.getLogger("rmrb_engine.http").info(
+                "http.done host=%s path=%s elapsedMs=%.1f bytes=%d",
+                urlsplit(url).netloc,
+                urlsplit(url).path,
+                (time.perf_counter() - started) * 1000,
+                len(result[0]),
+            )
+            return result
+        except EngineError as exc:
+            logging.getLogger("rmrb_engine.http").warning(
+                "http.failed host=%s path=%s code=%s",
+                urlsplit(url).netloc,
+                urlsplit(url).path,
+                exc.code.value,
+            )
+            raise
 
     def _wait(self, cancel: threading.Event) -> None:
         if cancel.wait(max(0, self._next_request - time.monotonic())):

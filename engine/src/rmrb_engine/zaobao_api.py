@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import threading
 import time
 import uuid
@@ -11,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from .core.errors import EngineError, ErrorCode
+from .diagnostics import log_exception
 from .services.control import Cancelled
 from .services.zaobao_service import ZaobaoService
 
@@ -38,10 +40,16 @@ class ZaobaoAPI:
             "zaobao.article.fetch": self.fetch,
             "zaobao.task.get": lambda p, c: self.task(p.get("jobId")),
             "zaobao.task.cancel": self.cancel,
-            "zaobao.cache.clear": lambda p, c: self.service.clear_cache(),
+            "zaobao.session.reset": self.reset,
             "zaobao.read.set": self.mark_read,
             "zaobao.original.open": self.open_original,
         }
+
+    def reset(self, params: dict, ctx: Any) -> dict:
+        with self._lock:
+            for cancel in self._cancel.values():
+                cancel.set()
+            return self.service.reset()
 
     def fetch(self, params: dict, ctx: Any) -> None:
         identity = self.service.summary(params.get("articleId")).article_id
@@ -75,6 +83,7 @@ class ZaobaoAPI:
                 "state": "queued",
                 "error": None,
                 "updated": time.monotonic(),
+                "session": self.service.session,
             }
             self._cancel[job] = threading.Event()
         ctx.respond({"jobId": job})
@@ -91,6 +100,8 @@ class ZaobaoAPI:
         with self._lock:
             cancel = self._cancel[job]
         try:
+            if task["session"] != self.service.session:
+                raise Cancelled()
             if task["kind"] == "feed":
                 self.service.refresh_feed(cancel)
             elif task["kind"] == "more":
@@ -103,15 +114,20 @@ class ZaobaoAPI:
         except EngineError as exc:
             self._change(job, "failed", exc.to_envelope())
         except Exception as exc:
+            log_exception("zaobao.task.exception", exc)
             self._change(
                 job,
                 "failed",
                 EngineError(ErrorCode.DISK_ERROR, "早报处理失败", detail=str(exc)).to_envelope(),
             )
-        finally:
-            self.service.db.close()
 
     def _change(self, job: str, state: str, error: dict | None = None) -> None:
+        logging.getLogger("rmrb_engine.zaobao").info(
+            "task.changed job=%s state=%s code=%s",
+            job,
+            state,
+            error.get("code") if error else "none",
+        )
         with self._lock:
             self._tasks[job].update(state=state, error=error, updated=time.monotonic())
             payload = self._snapshot(job)
